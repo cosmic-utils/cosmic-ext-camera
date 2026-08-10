@@ -14,8 +14,8 @@
     {
         "type": "git",
         "url": "https://github.com/pop-os/libcosmic",
-        "commit": "dc1cf9f00cbe2902a52166492654bb9fee8a73d1",
-        "dest": "flatpak-cargo/git/libcosmic-dc1cf9f"
+        "commit": "43a50cb6f5af18fa6cbea535fb46460a3c5cd573",
+        "dest": "flatpak-cargo/git/libcosmic-43a50cb"
     },
     {
         "type": "git",
@@ -1213,7 +1213,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/build_helpers\" \"cargo/vendor/build_helpers\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/build_helpers\" \"cargo/vendor/build_helpers\""
         ]
     },
     {
@@ -1478,27 +1478,27 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/clap/clap-4.6.4.crate",
-        "sha256": "d91e0c145792ef73a6ad36d27c75ac09f1832222a3c209689d90f534685ee5b7",
-        "dest": "cargo/vendor/clap-4.6.4"
+        "url": "https://static.crates.io/crates/clap/clap-4.6.5.crate",
+        "sha256": "301b56658598e48f3648647ac6fc887be7e7108eddfa4e9b63fcf3ec58c0cadf",
+        "dest": "cargo/vendor/clap-4.6.5"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"d91e0c145792ef73a6ad36d27c75ac09f1832222a3c209689d90f534685ee5b7\", \"files\": {}}",
-        "dest": "cargo/vendor/clap-4.6.4",
+        "contents": "{\"package\": \"301b56658598e48f3648647ac6fc887be7e7108eddfa4e9b63fcf3ec58c0cadf\", \"files\": {}}",
+        "dest": "cargo/vendor/clap-4.6.5",
         "dest-filename": ".cargo-checksum.json"
     },
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/clap_builder/clap_builder-4.6.2.crate",
-        "sha256": "f09628afdcc538b57f3c6341e9c8e9970f18e4a481690a64974d7023bd33548b",
-        "dest": "cargo/vendor/clap_builder-4.6.2"
+        "url": "https://static.crates.io/crates/clap_builder/clap_builder-4.6.5.crate",
+        "sha256": "94a65403d1a1bd28f7dc68eb8506e8874808ee5eecb59298de588e2e1407a078",
+        "dest": "cargo/vendor/clap_builder-4.6.5"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"f09628afdcc538b57f3c6341e9c8e9970f18e4a481690a64974d7023bd33548b\", \"files\": {}}",
-        "dest": "cargo/vendor/clap_builder-4.6.2",
+        "contents": "{\"package\": \"94a65403d1a1bd28f7dc68eb8506e8874808ee5eecb59298de588e2e1407a078\", \"files\": {}}",
+        "dest": "cargo/vendor/clap_builder-4.6.5",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -1888,7 +1888,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/cosmic-config\" \"cargo/vendor/cosmic-config\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/cosmic-config\" \"cargo/vendor/cosmic-config\""
         ]
     },
     {
@@ -1906,7 +1906,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/cosmic-config-derive\" \"cargo/vendor/cosmic-config-derive\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/cosmic-config-derive\" \"cargo/vendor/cosmic-config-derive\""
         ]
     },
     {
@@ -1991,7 +1991,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/cosmic-theme\" \"cargo/vendor/cosmic-theme\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/cosmic-theme\" \"cargo/vendor/cosmic-theme\""
         ]
     },
     {
@@ -4052,7 +4052,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced\" \"cargo/vendor/iced\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced\" \"cargo/vendor/iced\""
         ]
     },
     {
@@ -4070,7 +4070,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/accessibility\" \"cargo/vendor/iced_accessibility\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/accessibility\" \"cargo/vendor/iced_accessibility\""
         ]
     },
     {
@@ -4088,7 +4088,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/core\" \"cargo/vendor/iced_core\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/core\" \"cargo/vendor/iced_core\""
         ]
     },
     {
@@ -4106,7 +4106,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/debug\" \"cargo/vendor/iced_debug\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/debug\" \"cargo/vendor/iced_debug\""
         ]
     },
     {
@@ -4124,7 +4124,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/futures\" \"cargo/vendor/iced_futures\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/futures\" \"cargo/vendor/iced_futures\""
         ]
     },
     {
@@ -4142,7 +4142,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/graphics\" \"cargo/vendor/iced_graphics\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/graphics\" \"cargo/vendor/iced_graphics\""
         ]
     },
     {
@@ -4160,7 +4160,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/program\" \"cargo/vendor/iced_program\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/program\" \"cargo/vendor/iced_program\""
         ]
     },
     {
@@ -4178,7 +4178,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/renderer\" \"cargo/vendor/iced_renderer\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/renderer\" \"cargo/vendor/iced_renderer\""
         ]
     },
     {
@@ -4196,7 +4196,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/runtime\" \"cargo/vendor/iced_runtime\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/runtime\" \"cargo/vendor/iced_runtime\""
         ]
     },
     {
@@ -4214,7 +4214,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/tiny_skia\" \"cargo/vendor/iced_tiny_skia\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/tiny_skia\" \"cargo/vendor/iced_tiny_skia\""
         ]
     },
     {
@@ -4232,7 +4232,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/wgpu\" \"cargo/vendor/iced_wgpu\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/wgpu\" \"cargo/vendor/iced_wgpu\""
         ]
     },
     {
@@ -4250,7 +4250,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/widget\" \"cargo/vendor/iced_widget\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/widget\" \"cargo/vendor/iced_widget\""
         ]
     },
     {
@@ -4268,7 +4268,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/iced/winit\" \"cargo/vendor/iced_winit\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/iced/winit\" \"cargo/vendor/iced_winit\""
         ]
     },
     {
@@ -5027,7 +5027,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-dc1cf9f/.\" \"cargo/vendor/libcosmic\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/libcosmic-43a50cb/.\" \"cargo/vendor/libcosmic\""
         ]
     },
     {
