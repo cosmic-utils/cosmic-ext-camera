@@ -1,0 +1,9 @@
+camera = Kaamera
+about = Teave
+repository = Tarkvarahoidla
+mode-video = Video
+mode-photo = Foto
+mode-timelapse = Stoppkaader
+timelapse-saving = Salvestan videot…
+mode-virtual = Virtuaalne
+mode-view = Vaade
