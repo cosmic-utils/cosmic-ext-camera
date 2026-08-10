@@ -953,7 +953,7 @@ dependencies = [
 
 [[package]]
 name = "camera"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "ashpd 0.13.13",
  "async-stream",

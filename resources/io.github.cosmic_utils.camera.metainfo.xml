@@ -349,6 +349,17 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.2.1" date="2026-08-10">
+      <description>
+        <p>Release 1.2.1 includes the following changes:</p>
+        <ul>
+          <li>packaging: enable riscv64 for apk packages now that cosmic-icons is noarch</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump clap from 4.6.4 to 4.6.5 in the rust-dependencies group</li>
+          <li>chore(l10n): update translations</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.0" date="2026-07-30">
       <description>
         <p>Release 1.2.0 includes the following changes:</p>
