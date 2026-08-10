@@ -9,6 +9,7 @@
   <name xml:lang="cs">Kamera</name>
   <name xml:lang="de">Kamera</name>
   <name xml:lang="es">Cámara</name>
+  <name xml:lang="et">Kaamera</name>
   <name xml:lang="fi">Kamera</name>
   <name xml:lang="fr">Caméra</name>
   <name xml:lang="hu">Kamera</name>
@@ -32,6 +33,7 @@
     <p>Camera is a modern camera application for Linux, built for desktops and phones alike. Whether you need to snap a quick photo, record a video, or scan a QR code, Camera provides a clean and intuitive interface that stays out of your way.</p>
     <p xml:lang="cs">Kamera je moderní aplikace kamery pro Linux, navržená pro stolní počítače i mobilní zařízení. Ať už potřebujete rychle vyfotit snímek, natočit video nebo naskenovat QR kód, Kamera nabízí čisté a intuitivní rozhraní, které vás při používání neruší.</p>
     <p xml:lang="de">Kamera ist eine moderne Kamera-App für Linux, für den Desktop genauso wie fürs Smartphone. Ob du schnell ein Foto machst, ein Video aufnimmst oder einen QR-Code scannst, Kamera bleibt schlicht und übersichtlich und kommt dir dabei nicht in die Quere.</p>
+    <p xml:lang="fr">Caméra est une application d'appareil photo moderne pour Linux, conçue aussi bien pour les ordinateurs de bureau que pour les téléphones. Que vous souhaitiez prendre une photo rapidement, enregistrer une vidéo ou scanner un QR code, Caméra offre une interface épurée et intuitive qui sait se faire oublier.</p>
     <p xml:lang="hu">A Kamera egy modern kameraalkalmazás Linuxra, amely asztali számítógépekre és telefonokra egyaránt készült. Akár gyorsan szeretnél fotót készíteni, videót rögzíteni vagy QR-kódot beolvasni, a Kamera letisztult és könnyen használható felületet biztosít, amely nem vonja el a figyelmet.</p>
     <p xml:lang="pl">Aparat jest nowoczesną aplikacją aparatu dla Linuxa, zbudowaną zarówno dla komputerów i telefonów. Jeśli masz ochotę zrobić szybkie zdjęcie, nagrać film lub zeskanować kod QR, Aparat dostarcza przejrzystego i intuicyjnego interfejsu który Ci w tym nie przeszkadza.</p>
     <p xml:lang="pt-BR">O Câmera é um aplicativo de câmera moderno para Linux, desenvolvido para desktops e celulares. Seja para tirar uma foto rápida, gravar um vídeo ou escanear um código QR, o Câmera oferece uma interface limpa e intuitiva que não interfere na sua experiência.</p>
@@ -40,6 +42,7 @@
     <p>Just open the app and start capturing moments. Add fun filters to your photos, scan QR codes to open links or connect to WiFi, or use virtual camera mode to look great in video calls with your favorite filter applied.</p>
     <p xml:lang="cs">Otevřete aplikaci a začněte zachycovat okamžiky. Přidejte zábavné filtry ke svým fotografiím, skenujte QR kódy pro otevření odkazů nebo připojení k Wi-Fi, případně použijte režim virtuální kamery, abyste při videohovorech vypadali skvěle s aplikovaným oblíbeným filtrem.</p>
     <p xml:lang="de">Einfach die App öffnen und den Moment festhalten. Leg witzige Filter über deine Fotos, scanne QR-Codes, um Links zu öffnen oder dich mit WiFi zu verbinden, oder nutze die virtuelle Kamera, um in Videoanrufen mit deinem Lieblingsfilter gut auszusehen.</p>
+    <p xml:lang="fr">Il vous suffit d'ouvrir l'application pour commencer à immortaliser des moments. Ajoutez des filtres amusants à vos photos, scannez des QR codes pour ouvrir des liens ou vous connecter au Wi-Fi, ou utilisez le mode caméra virtuelle pour être à votre avantage lors des appels vidéo en appliquant votre filtre préféré.</p>
     <p xml:lang="hu">Csak nyisd meg az alkalmazást, és kezdd el megörökíteni a pillanatokat. Tegyél kreatív szűrőket a fotóidra, olvass be QR-kódokat hivatkozások megnyitásához vagy Wi-Fi-hálózatokhoz való kapcsolódáshoz, illetve használd a virtuális kamera módot, hogy kedvenc szűrőddel jelenj meg videóhívásokban.</p>
     <p xml:lang="pl">Po prostu otwórz aplikację i uwiecznij chwilę. Dodaj zabawne filtry do Twoich zdjęć, skanuj kody QR by otwierać linki lub łączyć się z WiFi, lub użyj wirtualnego aparatu by wyglądać bajecznie w wideorozmowach ze swoimi ulubionymi filtrami.</p>
     <p xml:lang="pt-BR">Basta abrir o aplicativo e começar a capturar momentos. Adicione filtros divertidos às suas fotos, escaneie códigos QR para abrir links ou conectar-se ao Wi-Fi, ou use o modo de câmera virtual para ficar incrível em videochamadas com seu filtro favorito aplicado.</p>
@@ -70,6 +73,7 @@
       <li>Photo, video and timelapse modes, with a self timer and composition guides</li>
       <li xml:lang="cs">Režimy fotografie, videa a časosběru, se samospouští a kompoziční mřížkou</li>
       <li xml:lang="de">Foto, Video und Zeitraffer, mit Selbstauslöser und Kompositionshilfen</li>
+      <li xml:lang="fr">Modes photo, vidéo et accéléré, avec retardateur et guides de composition</li>
       <li xml:lang="hu">Fotó-, videó- és time-lapse módok önkioldóval és kompozíciós segédvonalakkal</li>
       <li xml:lang="pl">Zdjęcia, filmy i tryb filmu poklatkowego, z własnym stoperem i przewodnikiem po regułach kompozycji</li>
       <li xml:lang="pt-BR">Modos de foto, vídeo e timelapse, com temporizador automático e guias de composição</li>
@@ -78,6 +82,7 @@
       <li>Manual controls: exposure, ISO, shutter, focus and white balance</li>
       <li xml:lang="cs">Manuální ovládání: expozice, ISO, závěrka, ostření a vyvážení bílé</li>
       <li xml:lang="de">Manuelle Steuerung: Belichtung, ISO, Verschlusszeit, Fokus und Weißabgleich</li>
+      <li xml:lang="fr">Commandes manuelles : exposition, ISO, vitesse d'obturation, mise au point et balance des blancs</li>
       <li xml:lang="hu">Kézi vezérlők: expozíció, ISO, záridő, fókusz és fehéregyensúly</li>
       <li xml:lang="pl">Ręczne sterowanie: czas naświetlenia, ISO, migawka, skupienie oraz balans bieli</li>
       <li xml:lang="pt-BR">Controles manuais: exposição, ISO, disparador, foco e balanço de branco</li>
@@ -86,6 +91,7 @@
       <li>QR code scanner: open links, connect to WiFi, and more</li>
       <li xml:lang="cs">Skener QR kódů: otevírání odkazů, připojení k Wi-Fi a další</li>
       <li xml:lang="de">QR-Code-Scanner: Links öffnen, mit WiFi verbinden und mehr</li>
+      <li xml:lang="fr">Scanner de QR codes : ouvrez des liens, connectez-vous au Wi-Fi et bien plus encore</li>
       <li xml:lang="hu">QR-kód olvasó: hivatkozások megnyitása, Wi-Fi-hálózatokhoz kapcsolódás és egyebek</li>
       <li xml:lang="pl">Skaner kodów QR: otwieraj linki, połącz z Wifi i nie tylko</li>
       <li xml:lang="pt-BR">Leitor de código QR: abra links, conecte-se ao Wi-Fi e muito mais</li>
@@ -95,6 +101,7 @@
       <li>14 creative filters: Mono, Sepia, Vivid, Noir, Pencil, and more</li>
       <li xml:lang="cs">14 kreativních filtrů: Černobílý, Sépie, Živý, Noir, Skica a další</li>
       <li xml:lang="de">14 kreative Filter: Mono, Sepia, Vivid, Noir, Skizze und mehr</li>
+      <li xml:lang="fr">14 filtres créatifs : Mono, Sépia, Vif, Noir, Crayon, et bien plus encore</li>
       <li xml:lang="hu">14 kreatív szűrő: Monokróm, Szépia, Élénk, Noir, Ceruza és még sok más</li>
       <li xml:lang="pl">14 creatywnych filtrów: Mono,Sepia,Żywe,Noir,Rysowanie, i nie tylko</li>
       <li xml:lang="pt-BR">14 filtros criativos: Mono, Sépia, Vívido, Noir, Lápis e muito mais</li>
@@ -104,6 +111,7 @@
       <li>Virtual camera: use your filtered camera feed in video calls and other apps</li>
       <li xml:lang="cs">Virtuální kamera: používejte filtrovaný obraz kamery při videohovorech a v dalších aplikacích</li>
       <li xml:lang="de">Virtuelle Kamera: dein gefiltertes Kamerabild in Videoanrufen und anderen Apps nutzen</li>
+      <li xml:lang="fr">Caméra virtuelle : utilisez le flux de votre caméra avec filtres dans les appels vidéo et autres applications</li>
       <li xml:lang="hu">Virtuális kamera: használd a szűrt kameraképet videóhívásokban és más alkalmazásokban</li>
       <li xml:lang="pl">Wirtualny aparat: użyj swój filtrowany zapis z aparatu w wideorozmowach i innych aplikacjach</li>
       <li xml:lang="pt-BR">Câmera virtual: use a imagem com filtro da sua câmera em videochamadas e outros aplicativos</li>
@@ -113,6 +121,7 @@
       <li>Multi-camera support: easily switch between cameras and microphones</li>
       <li xml:lang="cs">Podpora více kamer: snadné přepínání mezi kamerami a mikrofony</li>
       <li xml:lang="de">Mehrkamera-Unterstützung: einfach zwischen Kameras und Mikrofonen wechseln</li>
+      <li xml:lang="fr">Prise en charge de plusieurs caméras : passez facilement d'une caméra ou d'un microphone à l'autre</li>
       <li xml:lang="hu">Többkamerás támogatás: egyszerű váltás a kamerák és mikrofonok között</li>
       <li xml:lang="pl">Wsparcie dla wielu aparatów: zmieniaj z łatwością pomiędzy aparatami i mikrofonami</li>
       <li xml:lang="pt-BR">Suporte para múltiplas câmeras: alterne facilmente entre câmeras e microfones</li>
@@ -182,6 +191,7 @@
       <caption>Photo mode with tools menu</caption>
       <caption xml:lang="cs">Režim fotografie s nabídkou nástrojů</caption>
       <caption xml:lang="de">Fotomodus mit Werkzeugmenü</caption>
+      <caption xml:lang="fr">Mode photo avec menu d'outils</caption>
       <caption xml:lang="hu">Fotómód megnyitott eszközmenüvel</caption>
       <caption xml:lang="pl">Tryb zdjęciowy z menu narzędziowym</caption>
       <caption xml:lang="pt-BR">Modo foto com menu de ferramentas</caption>
@@ -207,6 +217,7 @@
       <caption>Photo mode on a Linux phone</caption>
       <caption xml:lang="cs">Režim fotografie na telefonu s Linuxem</caption>
       <caption xml:lang="de">Fotomodus auf einem Linux-Smartphone</caption>
+      <caption xml:lang="fr">Mode photo sur un téléphone Linux</caption>
       <caption xml:lang="hu">Fotómód linuxos telefonon</caption>
       <caption xml:lang="pl">Tryb zdjęciowy na telefonie z Linuxem</caption>
       <caption xml:lang="pt-BR">Modo foto em um telefone Linux</caption>
@@ -232,6 +243,7 @@
       <caption>Filter picker</caption>
       <caption xml:lang="cs">Výběr filtrů</caption>
       <caption xml:lang="de">Filterauswahl</caption>
+      <caption xml:lang="fr">Sélecteur de filtre</caption>
       <caption xml:lang="hu">Szűrőválasztó</caption>
       <caption xml:lang="pl">Wybór filtrów</caption>
       <caption xml:lang="pt-BR">Seletor de filtros</caption>
@@ -258,6 +270,7 @@
       <caption>Video recording in progress</caption>
       <caption xml:lang="cs">Probíhající natáčení videa</caption>
       <caption xml:lang="de">Laufende Videoaufnahme</caption>
+      <caption xml:lang="fr">Enregistrement vidéo en cours</caption>
       <caption xml:lang="hu">Folyamatban lévő videófelvétel</caption>
       <caption xml:lang="pl">Trwa nagrywanie filmu</caption>
       <caption xml:lang="pt-BR">Gravação de vídeo em andamento</caption>
@@ -284,6 +297,7 @@
       <caption>QR code detection</caption>
       <caption xml:lang="cs">Detekce QR kódu</caption>
       <caption xml:lang="de">QR-Code-Erkennung</caption>
+      <caption xml:lang="fr">Détection de QR code</caption>
       <caption xml:lang="hu">QR-kód felismerése</caption>
       <caption xml:lang="pl">Wykrywanie kodów QR</caption>
       <caption xml:lang="pt-BR">Detecção de código QR</caption>
@@ -310,6 +324,7 @@
       <caption>Advanced settings</caption>
       <caption xml:lang="cs">Pokročilá nastavení</caption>
       <caption xml:lang="de">Erweiterte Einstellungen</caption>
+      <caption xml:lang="fr">Paramètres avancés</caption>
       <caption xml:lang="hu">Speciális beállítások</caption>
       <caption xml:lang="pl">Zaawansowane ustawienia</caption>
       <caption xml:lang="pt-BR">Configurações avançadas</caption>
