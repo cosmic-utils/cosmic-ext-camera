@@ -74,6 +74,7 @@ to do. Only en gets the full appearance matrix above.
 - &lrm;[**Kamera** (`cs`)](locales/cs/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Kamera** (`de`)](locales/de/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Cámara** (`es`)](locales/es/README.md) &mdash; 6 shots, 0/6 captions translated
+- &lrm;[**Kaamera** (`et`)](locales/et/README.md) &mdash; 6 shots, 0/6 captions translated
 - &lrm;[**Kamera** (`fi`)](locales/fi/README.md) &mdash; 6 shots, 0/6 captions translated
 - &lrm;[**Caméra** (`fr`)](locales/fr/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Kamera** (`hu`)](locales/hu/README.md) &mdash; 6 shots, 6/6 captions translated
