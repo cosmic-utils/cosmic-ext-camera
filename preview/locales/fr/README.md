@@ -6,13 +6,9 @@
 
 |  |  |
 | :---: | :---: |
-| ![Photo mode with tools menu](preview-001.png)<br>**Photo mode with tools menu** | ![Photo mode on a Linux phone](preview-002.png)<br>**Photo mode on a Linux phone** |
-| ![Filter picker](preview-003.png)<br>**Filter picker** | ![Video recording in progress](preview-004.png)<br>**Video recording in progress** |
-| ![QR code detection](preview-005.png)<br>**QR code detection** | ![Advanced settings](preview-006.png)<br>**Advanced settings** |
-
-> 6 of 6 captions are not translated into `fr` yet
-> and are shown in English. Translations are welcome in
-> [`i18n/fr/camera.ftl`](../../../i18n/fr/camera.ftl).
+| ![Mode photo avec menu d'outils](preview-001.png)<br>**Mode photo avec menu d'outils** | ![Mode photo sur un téléphone Linux](preview-002.png)<br>**Mode photo sur un téléphone Linux** |
+| ![Sélecteur de filtre](preview-003.png)<br>**Sélecteur de filtre** | ![Enregistrement vidéo en cours](preview-004.png)<br>**Enregistrement vidéo en cours** |
+| ![Détection de QR code](preview-005.png)<br>**Détection de QR code** | ![Paramètres avancés](preview-006.png)<br>**Paramètres avancés** |
 
 ---
 
