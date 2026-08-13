@@ -2,6 +2,7 @@
 
 //! Canvas-based composition guide overlay widget
 
+use crate::app::preview_geometry::BarInsets;
 use crate::app::state::Message;
 use crate::config::CompositionGuide;
 use cosmic::iced::{Color, Length, Point, Rectangle};
@@ -27,10 +28,8 @@ struct GuideProgram {
     /// Cover/Contain blend: 0.0 = Contain (letterboxed inside content area),
     /// 1.0 = Cover (fills the canvas), interpolated during fit-animation.
     cover_blend: f32,
-    /// Top UI bar height in pixels — eats into the content area in Contain.
-    top_bar_h: f32,
-    /// Bottom UI scrim height in pixels — likewise.
-    bottom_bar_h: f32,
+    /// Four-sided UI reservations shared with the live preview.
+    insets: BarInsets,
 }
 
 impl GuideProgram {
@@ -45,11 +44,12 @@ impl GuideProgram {
     ///   canvas crop overlay (`OverlayBackgroundProgram`) frames, so the
     ///   guide lines align with the translucent crop bars exactly.
     fn cover_rect(&self, bounds: Rectangle) -> Rectangle {
-        let content_y = bounds.y + self.top_bar_h;
-        let content_h = (bounds.height - self.top_bar_h - self.bottom_bar_h).max(0.0);
-        let content_w = bounds.width;
+        let content_x = bounds.x + self.insets.left;
+        let content_y = bounds.y + self.insets.top;
+        let content_h = (bounds.height - self.insets.top - self.insets.bottom).max(0.0);
+        let content_w = (bounds.width - self.insets.left - self.insets.right).max(0.0);
         let content_rect = Rectangle {
-            x: bounds.x,
+            x: content_x,
             y: content_y,
             width: content_w,
             height: content_h,
@@ -62,7 +62,7 @@ impl GuideProgram {
                     // Letterbox top/bottom inside the content area.
                     let h = content_w / ratio;
                     Rectangle {
-                        x: bounds.x,
+                        x: content_x,
                         y: content_y + (content_h - h) / 2.0,
                         width: content_w,
                         height: h,
@@ -71,7 +71,7 @@ impl GuideProgram {
                     // Pillarbox the sides inside the content area.
                     let w = content_h * ratio;
                     Rectangle {
-                        x: bounds.x + (content_w - w) / 2.0,
+                        x: content_x + (content_w - w) / 2.0,
                         y: content_y,
                         width: w,
                         height: content_h,
@@ -87,12 +87,13 @@ impl GuideProgram {
     /// bottom-bar scrim. The aspect-crop ratio (when set) drives the
     /// letterbox; otherwise the rotated sensor aspect does.
     fn contain_rect(&self, bounds: Rectangle) -> Rectangle {
-        let content_y = bounds.y + self.top_bar_h;
-        let content_h = (bounds.height - self.top_bar_h - self.bottom_bar_h).max(0.0);
-        let content_w = bounds.width;
+        let content_x = bounds.x + self.insets.left;
+        let content_y = bounds.y + self.insets.top;
+        let content_h = (bounds.height - self.insets.top - self.insets.bottom).max(0.0);
+        let content_w = (bounds.width - self.insets.left - self.insets.right).max(0.0);
         if content_h <= 0.0 || content_w <= 0.0 || self.rotated_sensor_h <= 0.0 {
             return Rectangle {
-                x: bounds.x,
+                x: content_x,
                 y: content_y,
                 width: 0.0,
                 height: 0.0,
@@ -105,7 +106,7 @@ impl GuideProgram {
         if frame_aspect > content_aspect {
             let h = content_w / frame_aspect;
             Rectangle {
-                x: bounds.x,
+                x: content_x,
                 y: content_y + (content_h - h) / 2.0,
                 width: content_w,
                 height: h,
@@ -113,7 +114,7 @@ impl GuideProgram {
         } else {
             let w = content_h * frame_aspect;
             Rectangle {
-                x: bounds.x + (content_w - w) / 2.0,
+                x: content_x + (content_w - w) / 2.0,
                 y: content_y,
                 width: w,
                 height: content_h,
@@ -359,8 +360,7 @@ pub fn composition_canvas<'a>(
     rotated_sensor_h: f32,
     aspect_crop_ratio: Option<f32>,
     cover_blend: f32,
-    top_bar_h: f32,
-    bottom_bar_h: f32,
+    insets: BarInsets,
 ) -> cosmic::Element<'a, Message> {
     cosmic::widget::Canvas::new(GuideProgram {
         guide,
@@ -368,8 +368,7 @@ pub fn composition_canvas<'a>(
         rotated_sensor_h,
         aspect_crop_ratio,
         cover_blend,
-        top_bar_h,
-        bottom_bar_h,
+        insets,
     })
     .width(Length::Fill)
     .height(Length::Fill)

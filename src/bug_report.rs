@@ -559,6 +559,10 @@ impl BugReportGenerator {
             ));
         }
         info.push_str(&format!(
+            "- **Controls Position:** {:?}\n",
+            config.controls_position
+        ));
+        info.push_str(&format!(
             "- **Virtual Camera:** {}\n",
             config.virtual_camera_enabled
         ));
@@ -1238,5 +1242,18 @@ mod tests {
         let config = Config::default();
         let settings = BugReportGenerator::format_settings(&config, None, None, None);
         assert!(settings.contains("- **Overlay Effect:**"), "{settings}");
+    }
+
+    #[test]
+    fn settings_report_includes_controls_position() {
+        let config = Config {
+            controls_position: crate::config::ControlsPosition::Left,
+            ..Default::default()
+        };
+        let settings = BugReportGenerator::format_settings(&config, None, None, None);
+        assert!(
+            settings.contains("- **Controls Position:** Left"),
+            "{settings}"
+        );
     }
 }

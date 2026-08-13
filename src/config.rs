@@ -6,6 +6,24 @@ use cosmic::{Theme, theme};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Preferred location of the capture-controls panel.
+///
+/// `Bottom` keeps the existing orientation-aware behavior: the panel follows
+/// the physical bottom edge reported by the compositor. `Left` and `Right`
+/// are explicit window-edge overrides for desktops and devices without useful
+/// orientation data.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub enum ControlsPosition {
+    #[default]
+    Bottom,
+    Left,
+    Right,
+}
+
+impl ControlsPosition {
+    pub const ALL: [Self; 3] = [Self::Bottom, Self::Left, Self::Right];
+}
+
 /// Photo output format preference
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub enum PhotoOutputFormat {
@@ -416,13 +434,16 @@ pub struct FormatSettings {
 pub type VideoSettings = FormatSettings;
 
 #[derive(Debug, Clone, CosmicConfigEntry, Eq, PartialEq, Serialize, Deserialize)]
-#[version = 20]
+#[version = 21]
 pub struct Config {
     /// Application theme preference (System, Dark, Light)
     pub app_theme: AppTheme,
     /// How overlay chrome is painted over the preview (frosted / translucent /
     /// opaque), or System to follow COSMIC's frosting setting
     pub overlay_effect: OverlayEffect,
+    /// Capture-controls panel location. Bottom follows compositor orientation;
+    /// Left and Right explicitly override the UI layout edge.
+    pub controls_position: ControlsPosition,
     /// Default camera mode on launch
     pub default_mode: crate::app::CameraMode,
     /// Folder name for saving captures (photos go to XDG Pictures, videos go to XDG Videos)
@@ -493,6 +514,7 @@ impl Default for Config {
         Self {
             app_theme: AppTheme::default(),           // Default to System theme
             overlay_effect: OverlayEffect::default(), // System on COSMIC, Translucent elsewhere
+            controls_position: ControlsPosition::default(),
             default_mode: crate::app::CameraMode::default(), // Default to Photo
             save_folder_name: crate::constants::DEFAULT_SAVE_FOLDER.to_string(),
             last_camera_path: None,
@@ -526,6 +548,15 @@ impl Default for Config {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn controls_position_defaults_to_bottom() {
+        assert_eq!(
+            Config::default().controls_position,
+            ControlsPosition::Bottom
+        );
+        assert_eq!(ControlsPosition::ALL[0], ControlsPosition::Bottom);
+    }
 
     /// Off-COSMIC there is no frosting flag to follow, so `System` would mean
     /// exactly `Translucent`. It must not be offered.

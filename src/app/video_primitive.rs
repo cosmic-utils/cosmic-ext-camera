@@ -322,6 +322,11 @@ struct ViewportUniform {
     /// earlier offset is untouched, so the five shaders that stop short of it stay
     /// valid against the same, larger buffer.
     content_rect: [f32; 4],
+    /// Left/right bar widths in pixels. Appended to preserve every existing
+    /// uniform offset while extending Contain/Fit to side controls.
+    bar_left_width: f32,
+    bar_right_width: f32,
+    _side_pad: [f32; 2],
 }
 
 impl Default for ViewportUniform {
@@ -351,6 +356,9 @@ impl Default for ViewportUniform {
             noise: 0.0,
             _pad: [0.0; 3],
             content_rect: FULL_CONTENT_RECT,
+            bar_left_width: 0.0,
+            bar_right_width: 0.0,
+            _side_pad: [0.0; 2],
         }
     }
 }
@@ -402,21 +410,27 @@ const FULL_CONTENT_RECT: [f32; 4] = [0.0, 0.0, 1.0, 1.0];
 /// changes which texels are sampled, never how much of the screen the image
 /// covers.
 #[allow(clippy::too_many_arguments)]
-fn content_rect_uv(
+fn content_rect_uv_with_insets(
     viewport_size: [f32; 2],
     tex_size: (u32, u32),
     rotation: u32,
     crop_min: [f32; 2],
     crop_max: [f32; 2],
     cover_blend: f32,
-    bar_top: f32,
-    bar_bottom: f32,
+    insets: crate::app::preview_geometry::BarInsets,
 ) -> [f32; 4] {
     let [w, h] = viewport_size;
-    let content_h = h - bar_top - bar_bottom;
+    let content_w = w - insets.left - insets.right;
+    let content_h = h - insets.top - insets.bottom;
     // A window with no room between its own chrome has no meaningful contain fit
     // (the shader's `contain_zoom` goes non-positive there). Paint everything.
-    if w <= 0.0 || h <= 0.0 || content_h <= 0.0 || tex_size.0 == 0 || tex_size.1 == 0 {
+    if w <= 0.0
+        || h <= 0.0
+        || content_w <= 0.0
+        || content_h <= 0.0
+        || tex_size.0 == 0
+        || tex_size.1 == 0
+    {
         return FULL_CONTENT_RECT;
     }
 
@@ -440,11 +454,12 @@ fn content_rect_uv(
         return FULL_CONTENT_RECT;
     }
 
-    let contain_zoom = (w / eff_w).min(content_h / eff_h);
+    let contain_zoom = (content_w / eff_w).min(content_h / eff_h);
     let cover_zoom = (w / eff_w).max(h / eff_h);
     let zoom = lerp(contain_zoom, cover_zoom);
     // Contain centres the image between the UI bars, Cover on the window.
-    let center_y = lerp((bar_top + content_h * 0.5) / h, 0.5);
+    let center_x = lerp((insets.left + content_w * 0.5) / w, 0.5);
+    let center_y = lerp((insets.top + content_h * 0.5) / h, 0.5);
 
     // `scale = viewport / (effective_tex * zoom)` is the shader's UV scale, so
     // the image's on-screen extent is `effective_tex * zoom` — in the same
@@ -452,11 +467,38 @@ fn content_rect_uv(
     let half_w = eff_w * zoom * 0.5 / w;
     let half_h = eff_h * zoom * 0.5 / h;
     [
-        0.5 - half_w,
+        center_x - half_w,
         center_y - half_h,
-        0.5 + half_w,
+        center_x + half_w,
         center_y + half_h,
     ]
+}
+
+#[cfg(test)]
+#[allow(clippy::too_many_arguments)]
+fn content_rect_uv(
+    viewport_size: [f32; 2],
+    tex_size: (u32, u32),
+    rotation: u32,
+    crop_min: [f32; 2],
+    crop_max: [f32; 2],
+    cover_blend: f32,
+    bar_top: f32,
+    bar_bottom: f32,
+) -> [f32; 4] {
+    content_rect_uv_with_insets(
+        viewport_size,
+        tex_size,
+        rotation,
+        crop_min,
+        crop_max,
+        cover_blend,
+        crate::app::preview_geometry::BarInsets {
+            top: bar_top,
+            bottom: bar_bottom,
+            ..Default::default()
+        },
+    )
 }
 
 /// The `(panel_rect, corner_radius)` an antialiased corner SDF is cut with, in
@@ -558,8 +600,8 @@ const TRANSITION_BLUR_PARAMS: CompositorBlurParams = CompositorBlurParams {
 #[derive(Debug)]
 pub struct FrameViewportData {
     pub frame: Option<VideoFrame>,
-    /// (width, height, cover_blend, bar_top_px, bar_bottom_px)
-    pub viewport: (f32, f32, f32, f32, f32),
+    /// (width, height, cover_blend, four-sided bar insets)
+    pub viewport: (f32, f32, f32, crate::app::preview_geometry::BarInsets),
     /// Physical widget bounds (x, y, width, height) clamped to render target
     /// Stored during prepare() and used in render() for valid viewport rect
     pub physical_bounds: Option<(f32, f32, f32, f32)>,
@@ -659,7 +701,12 @@ impl Default for FrameViewportData {
     fn default() -> Self {
         Self {
             frame: None,
-            viewport: (0.0, 0.0, 0.0, 0.0, 0.0),
+            viewport: (
+                0.0,
+                0.0,
+                0.0,
+                crate::app::preview_geometry::BarInsets::default(),
+            ),
             physical_bounds: None,
             uv_offset: (0.0, 0.0),
             uv_scale: (1.0, 1.0),
@@ -1082,11 +1129,10 @@ impl VideoPrimitive {
         width: f32,
         height: f32,
         cover_blend: f32,
-        bar_top_px: f32,
-        bar_bottom_px: f32,
+        insets: crate::app::preview_geometry::BarInsets,
     ) {
         if let Ok(mut guard) = self.data.lock() {
-            guard.viewport = (width, height, cover_blend, bar_top_px, bar_bottom_px);
+            guard.viewport = (width, height, cover_blend, insets);
         }
     }
 }
@@ -1307,7 +1353,7 @@ impl PrimitiveTrait for VideoPrimitive {
             }
 
             // Update viewport uniform data (using viewport_data captured before releasing lock)
-            let (mut width, mut height, cover_blend, bar_top, bar_bottom) = viewport_data;
+            let (mut width, mut height, cover_blend, insets) = viewport_data;
 
             // Same reason `frosted_full_physical` is the render target above: the
             // pass-0 uniform lives in the binding keyed by `(video_id,
@@ -1379,8 +1425,10 @@ impl PrimitiveTrait for VideoPrimitive {
                         // default and must keep doing so or the zoom compounds.
                         zoom_level: self.zoom_level,
                         rotation: self.rotation,
-                        bar_top_height: bar_top,
-                        bar_bottom_height: bar_bottom,
+                        bar_top_height: insets.top,
+                        bar_bottom_height: insets.bottom,
+                        bar_left_width: insets.left,
+                        bar_right_width: insets.right,
                         letterbox_color: self.letterbox_color,
                         ..Default::default()
                     };
@@ -1404,8 +1452,10 @@ impl PrimitiveTrait for VideoPrimitive {
                         crop_uv_max: crop_max,
                         zoom_level: self.zoom_level,
                         rotation: self.rotation,
-                        bar_top_height: bar_top,
-                        bar_bottom_height: bar_bottom,
+                        bar_top_height: insets.top,
+                        bar_bottom_height: insets.bottom,
+                        bar_left_width: insets.left,
+                        bar_right_width: insets.right,
                         letterbox_color: self.letterbox_color,
                         ..Default::default()
                     };
@@ -1573,15 +1623,14 @@ impl PrimitiveTrait for VideoPrimitive {
                         .textures
                         .get(&source_texture_id(self.video_id))
                         .map_or(FULL_CONTENT_RECT, |tex| {
-                            content_rect_uv(
+                            content_rect_uv_with_insets(
                                 [width, height],
                                 (tex.width, tex.height),
                                 self.rotation,
                                 crop_min,
                                 crop_max,
                                 content_fit_mode,
-                                bar_top,
-                                bar_bottom,
+                                insets,
                             )
                         });
 
@@ -3559,7 +3608,7 @@ mod tests {
     /// and those declarations describing the same bytes, and a mismatch shows up
     /// as silently garbled rendering rather than a compile error — so pin them.
     ///
-    /// `panel_rect`, `noise` and `content_rect` are deliberately LAST: only the
+    /// `panel_rect`, `noise`, `content_rect`, and side insets are appended: only the
     /// composite shader declares them, and the other shaders stay valid against
     /// the same (larger) buffer precisely because every field before them keeps
     /// its offset.
@@ -3587,7 +3636,9 @@ mod tests {
         // a `vec3<f32>` pad in the WGSL to mirror `_pad` would align to 16 too
         // and silently push this to 144.
         assert_eq!(offset_of!(ViewportUniform, content_rect), 128);
-        assert_eq!(size_of::<ViewportUniform>(), 144);
+        assert_eq!(offset_of!(ViewportUniform, bar_left_width), 144);
+        assert_eq!(offset_of!(ViewportUniform, bar_right_width), 148);
+        assert_eq!(size_of::<ViewportUniform>(), 160);
         assert_eq!(size_of::<ViewportUniform>() % 16, 0);
         assert_eq!(align_of::<ViewportUniform>(), 4);
     }
@@ -3673,6 +3724,82 @@ mod tests {
              {content_centre:.4} — centring on the window instead would slide the \
              blurred slice against the sharp preview"
         );
+    }
+
+    #[test]
+    fn content_rect_in_fit_uses_left_and_right_bar_insets() {
+        let fit = |insets| {
+            content_rect_uv_with_insets(
+                [1000.0, 600.0],
+                (800, 600),
+                0,
+                [0.0, 0.0],
+                [1.0, 1.0],
+                0.0,
+                insets,
+            )
+        };
+        let left = fit(crate::app::preview_geometry::BarInsets {
+            left: 200.0,
+            ..Default::default()
+        });
+        let right = fit(crate::app::preview_geometry::BarInsets {
+            right: 200.0,
+            ..Default::default()
+        });
+
+        for (actual, expected) in left.into_iter().zip([0.2, 0.0, 1.0, 1.0]) {
+            assert!((actual - expected).abs() < 0.0001, "left fit was {left:?}");
+        }
+        for (actual, expected) in right.into_iter().zip([0.0, 0.0, 0.8, 1.0]) {
+            assert!(
+                (actual - expected).abs() < 0.0001,
+                "right fit was {right:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn content_rect_in_fill_ignores_side_bar_insets() {
+        for insets in [
+            crate::app::preview_geometry::BarInsets {
+                left: 200.0,
+                ..Default::default()
+            },
+            crate::app::preview_geometry::BarInsets {
+                right: 200.0,
+                ..Default::default()
+            },
+        ] {
+            let rect = content_rect_uv_with_insets(
+                [1000.0, 600.0],
+                (800, 600),
+                0,
+                [0.0, 0.0],
+                [1.0, 1.0],
+                1.0,
+                insets,
+            );
+            assert!(
+                rect[0] <= 0.0 && rect[1] <= 0.0 && rect[2] >= 1.0 && rect[3] >= 1.0,
+                "Fill must still cover the full window, got {rect:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn every_transform_shader_mirrors_the_asymmetric_fit_pivot() {
+        for (name, shader) in [
+            ("preview", include_str!("video_shader.wgsl")),
+            ("blur", include_str!("video_shader_blur.wgsl")),
+            ("preblur", include_str!("video_shader_preblur.wgsl")),
+        ] {
+            assert!(
+                shader
+                    .contains("select(center_x, 1.0 - center_x, viewport.mirror_horizontal == 1u)"),
+                "{name} must mirror the fit pivot with the sampled selfie image"
+            );
+        }
     }
 
     /// A 90/270 sensor rotation swaps the image's axes, so a landscape sensor
@@ -3938,7 +4065,12 @@ mod tests {
             stride: N * 4,
             yuv_planes: None,
         });
-        primitive.update_viewport(N as f32, N as f32, 1.0, 0.0, 0.0);
+        primitive.update_viewport(
+            N as f32,
+            N as f32,
+            1.0,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
 
         let bounds = Rectangle {
             x: 0.0,
@@ -4119,7 +4251,12 @@ mod tests {
         });
         // Cover, as the swatches use: the image fills the widget edge to edge, so
         // the only thing that can clear a corner is the corner SDF.
-        primitive.update_viewport(N as f32, N as f32, 1.0, 0.0, 0.0);
+        primitive.update_viewport(
+            N as f32,
+            N as f32,
+            1.0,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
 
         let bounds = Rectangle {
             x: 0.0,
@@ -4314,7 +4451,12 @@ mod tests {
         preview.filter_type = FilterType::Pencil;
         preview.corner_radius = 0.0;
         preview.update_frame(frame(VIDEO_ID_NORMAL));
-        preview.update_viewport(N as f32, N as f32, 1.0, 0.0, 0.0);
+        preview.update_viewport(
+            N as f32,
+            N as f32,
+            1.0,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
         let preview_bounds = Rectangle {
             x: 0.0,
             y: 0.0,
@@ -4330,7 +4472,12 @@ mod tests {
             swatch.filter_type = FilterType::Pencil;
             swatch.corner_radius = 8.0;
             swatch.update_frame(frame(VIDEO_ID_FILTER_PREVIEW));
-            swatch.update_viewport(SWATCH, SWATCH, 1.0, 0.0, 0.0);
+            swatch.update_viewport(
+                SWATCH,
+                SWATCH,
+                1.0,
+                crate::app::preview_geometry::BarInsets::default(),
+            );
             let bounds = Rectangle {
                 x: N as f32 - SWATCH,
                 y: N as f32 - SWATCH,
@@ -4770,7 +4917,12 @@ mod tests {
             stride: src * 4,
             yuv_planes: None,
         });
-        primitive.update_viewport(n as f32, n as f32, 1.0, 0.0, 0.0);
+        primitive.update_viewport(
+            n as f32,
+            n as f32,
+            1.0,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
 
         let bounds = Rectangle {
             x: 0.0,
@@ -5206,7 +5358,12 @@ mod tests {
         // straight off `VideoPrimitive::new`.
         let blur_primitive = VideoPrimitive::new(VIDEO_ID_BLUR);
         blur_primitive.update_frame(make_frame(VIDEO_ID_BLUR));
-        blur_primitive.update_viewport(N as f32, N as f32, 1.0, 0.0, 0.0);
+        blur_primitive.update_viewport(
+            N as f32,
+            N as f32,
+            1.0,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
 
         // The frosted chrome: the compositor's own params, no dim, plus grain.
         // Two panels, because a real frame draws several (picker + chips + bars).
@@ -5214,7 +5371,12 @@ mod tests {
             let mut p = VideoPrimitive::new(VIDEO_ID_FROSTED);
             p.blur_params = frost_params;
             p.update_frame(make_frame(VIDEO_ID_FROSTED));
-            p.update_viewport(N as f32, N as f32, 1.0, 0.0, 0.0);
+            p.update_viewport(
+                N as f32,
+                N as f32,
+                1.0,
+                crate::app::preview_geometry::BarInsets::default(),
+            );
             p
         };
         let frosted_primitive = make_frosted();
@@ -5842,7 +6004,12 @@ mod tests {
             stride: n * 4,
             yuv_planes: None,
         });
-        primitive.update_viewport(n as f32, n as f32, 1.0, 0.0, 0.0);
+        primitive.update_viewport(
+            n as f32,
+            n as f32,
+            1.0,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
 
         let bounds = Rectangle {
             x: 0.0,
@@ -6337,7 +6504,12 @@ mod tests {
             stride: N * 4,
             yuv_planes: None,
         });
-        primitive.update_viewport(N as f32, N as f32, 1.0, 0.0, 0.0);
+        primitive.update_viewport(
+            N as f32,
+            N as f32,
+            1.0,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
 
         let bounds = Rectangle {
             x: 0.0,
@@ -6540,7 +6712,16 @@ mod tests {
         });
         // Exactly `FrostedScrim::draw`: the FULL window is the viewport size;
         // the bars are only ever the scissor.
-        primitive.update_viewport(WW as f32, WH as f32, blend, BAR_TOP, BAR_BOTTOM);
+        primitive.update_viewport(
+            WW as f32,
+            WH as f32,
+            blend,
+            crate::app::preview_geometry::BarInsets {
+                top: BAR_TOP,
+                bottom: BAR_BOTTOM,
+                ..Default::default()
+            },
+        );
 
         let viewport = Viewport::with_physical_size(cosmic::iced::Size::new(WW, WH), 1.0);
 
@@ -6584,7 +6765,16 @@ mod tests {
         // the phone's do. The exact sign does not matter — only that the two
         // consumers of one chain disagree, and that the disagreement survives
         // clamping to the render target and so reaches `ensure_blur_targets`.
-        chip.update_viewport(WW as f32 - 2.0, WH as f32 - 2.0, blend, BAR_TOP, BAR_BOTTOM);
+        chip.update_viewport(
+            WW as f32 - 2.0,
+            WH as f32 - 2.0,
+            blend,
+            crate::app::preview_geometry::BarInsets {
+                top: BAR_TOP,
+                bottom: BAR_BOTTOM,
+                ..Default::default()
+            },
+        );
         chip.prepare(
             &mut pipeline,
             &device,
@@ -6748,7 +6938,12 @@ mod tests {
             stride: WW * 4,
             yuv_planes: None,
         });
-        primitive.update_viewport(WW as f32, WH as f32, 1.0, 0.0, 0.0);
+        primitive.update_viewport(
+            WW as f32,
+            WH as f32,
+            1.0,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
 
         // Top and bottom bars, as `scrim_bars` emits them.
         let bars = [
@@ -7105,7 +7300,12 @@ mod tests {
             stride: SW * 4,
             yuv_planes: None,
         });
-        primitive.update_viewport(N as f32, N as f32, blend, 0.0, 0.0);
+        primitive.update_viewport(
+            N as f32,
+            N as f32,
+            blend,
+            crate::app::preview_geometry::BarInsets::default(),
+        );
 
         let viewport = Viewport::with_physical_size(cosmic::iced::Size::new(N, N), 1.0);
         let full = Rectangle {
@@ -7386,7 +7586,16 @@ mod tests {
         });
         // Exactly `FrostedScrim::draw`: its layout bounds are both the reported
         // preview geometry and the fit's viewport size.
-        primitive.update_viewport(946.0, 584.0, 1.0, 47.0, 174.0);
+        primitive.update_viewport(
+            946.0,
+            584.0,
+            1.0,
+            crate::app::preview_geometry::BarInsets {
+                top: 47.0,
+                bottom: 174.0,
+                ..Default::default()
+            },
+        );
 
         let viewport = Viewport::with_physical_size(cosmic::iced::Size::new(RT_W, RT_H), 1.5);
         let bars = [
@@ -7416,7 +7625,16 @@ mod tests {
             let mut chip = VideoPrimitive::new(VIDEO_ID_FROSTED);
             chip.blur_params = compositor_blur_params(level);
             chip.letterbox_color = [1.0, 0.0, 1.0, 1.0];
-            chip.update_viewport(948.0, 586.0, 1.0, 47.0, 174.0);
+            chip.update_viewport(
+                948.0,
+                586.0,
+                1.0,
+                crate::app::preview_geometry::BarInsets {
+                    top: 47.0,
+                    bottom: 174.0,
+                    ..Default::default()
+                },
+            );
             let rect = Rectangle {
                 x: 400.0,
                 y: 300.0,

@@ -660,6 +660,11 @@ pub struct AppModel {
     /// Rotation of the camera that produced the current frame
     /// (used during blur transitions to maintain correct rotation)
     pub current_frame_rotation: crate::backends::camera::types::SensorRotation,
+    /// Display orientation reported by the compositor via
+    /// `wl_output::geometry.transform`. Combined with the sensor's
+    /// mounting rotation at render time so the preview stays upright
+    /// when the phone is rotated between portrait and landscape.
+    pub display_orientation: crate::backends::display_orientation::DisplayOrientation,
     /// Rotation of the camera that produced the blur frame
     /// (captured at start of blur transition to maintain correct rotation during transition)
     pub blur_frame_rotation: crate::backends::camera::types::SensorRotation,
@@ -824,6 +829,8 @@ pub struct AppModel {
     /// Off). Built from `OverlayEffect::available()`, so System is absent
     /// off-COSMIC — index with that same slice, never with `ALL`.
     pub overlay_effect_dropdown_options: Vec<String>,
+    /// Capture-controls position dropdown options (Bottom, Left, Right).
+    pub controls_position_dropdown_options: Vec<String>,
     /// Burst mode merge mode dropdown options (Quality FFT, Fast Spatial)
     pub burst_mode_merge_dropdown_options: Vec<String>,
     /// Burst mode frame count dropdown options (Auto, 4, 6, 8 frames)
@@ -1642,6 +1649,11 @@ pub enum Message {
     /// volume-key `EVIOCGRAB` and dispatch gate so we only consume the
     /// hardware shutter buttons while the camera is in focus.
     WindowFocusChanged(bool),
+    /// Compositor reported a new display transform (phone rotated, or
+    /// initial output geometry at startup). Stored on `AppModel` and
+    /// composed with the sensor mounting rotation at preview time so
+    /// the preview reorients with the screen.
+    DisplayOrientationChanged(crate::backends::display_orientation::DisplayOrientation),
     /// Window control: close
     WindowClose,
     /// Window control: minimize
@@ -1730,6 +1742,8 @@ pub enum Message {
     SetAppTheme(usize),
     /// Set the overlay effect. Index into `OverlayEffect::available()`.
     SetOverlayEffect(usize),
+    /// Set the capture-controls panel position (Bottom, Left, Right).
+    SetControlsPosition(usize),
     /// Set default camera mode on launch
     SelectDefaultMode(usize),
     /// XDG portal color scheme changed (true = dark, false = light)

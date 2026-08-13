@@ -51,6 +51,10 @@ struct ViewportUniform {
     dim_factor: f32,            // Unused here — applied by the final composite
     letterbox_color: vec4<f32>, // RGBA fill for letterbox (alpha unused)
     panel_rect: vec4<f32>,      // Unused here — read by the final composite
+    noise: f32,
+    content_rect: vec4<f32>,
+    bar_left_width: f32,
+    bar_right_width: f32,
 }
 
 @group(0) @binding(2)
@@ -120,11 +124,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
         let effective_tex = tex_size_dim * crop_range;
 
+        let content_width = viewport.viewport_size.x - viewport.bar_left_width - viewport.bar_right_width;
         let content_height = viewport.viewport_size.y - viewport.bar_top_height - viewport.bar_bottom_height;
+        let content_center_x = (viewport.bar_left_width + content_width * 0.5) / viewport.viewport_size.x;
         let content_center_y = (viewport.bar_top_height + content_height * 0.5) / viewport.viewport_size.y;
-        let contain_zoom = min(viewport.viewport_size.x / effective_tex.x, content_height / effective_tex.y);
+        let contain_zoom = min(content_width / effective_tex.x, content_height / effective_tex.y);
         let cover_zoom = max(viewport.viewport_size.x / effective_tex.x, viewport.viewport_size.y / effective_tex.y);
         let zoom = mix(contain_zoom, cover_zoom, blend);
+        let center_x = mix(content_center_x, 0.5, blend);
         let center_y = mix(content_center_y, 0.5, blend);
         var scale = vec2<f32>(
             viewport.viewport_size.x / (effective_tex.x * zoom),
@@ -136,7 +143,8 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
 
         // Rotate the screen-space pivot into texture-UV space — see video_shader.wgsl.
-        var pivot = vec2<f32>(0.5, center_y);
+        let pivot_x = select(center_x, 1.0 - center_x, viewport.mirror_horizontal == 1u);
+        var pivot = vec2<f32>(pivot_x, center_y);
         if (viewport.rotation == 1u) {
             pivot = vec2<f32>(1.0 - pivot.y, pivot.x);
         } else if (viewport.rotation == 2u) {

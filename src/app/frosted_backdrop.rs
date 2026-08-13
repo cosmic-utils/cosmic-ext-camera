@@ -60,7 +60,7 @@
 //! libcosmic's `rounded_rect_strips`) can only ever produce a staircase, which
 //! is glaringly visible next to the panel tint's own antialiased edge.
 
-use crate::app::preview_geometry::{frame_rect_on_screen, scrim_bars};
+use crate::app::preview_geometry::{BarInsets, frame_rect_on_screen, scrim_bars};
 use crate::app::state::Message;
 use crate::app::video_primitive::{
     VIDEO_ID_FROSTED, VideoFrame, VideoPrimitive, compositor_blur_params,
@@ -165,8 +165,7 @@ pub struct FrostedContainer<'a> {
     panel: Element<'a, Message, Theme, Renderer>,
     primitive: VideoPrimitive,
     cover_blend: f32,
-    bar_top_px: f32,
-    bar_bottom_px: f32,
+    insets: BarInsets,
 }
 
 impl<'a> FrostedContainer<'a> {
@@ -180,8 +179,7 @@ impl<'a> FrostedContainer<'a> {
             panel,
             primitive: make_primitive(frame, config, corner_radius),
             cover_blend: config.cover_blend.unwrap_or(1.0),
-            bar_top_px: config.bar_top_px,
-            bar_bottom_px: config.bar_bottom_px,
+            insets: config.insets,
         }
     }
 }
@@ -243,8 +241,7 @@ impl<'a> Widget<Message, Theme, Renderer> for FrostedContainer<'a> {
             viewport.width,
             viewport.height,
             self.cover_blend,
-            self.bar_top_px,
-            self.bar_bottom_px,
+            self.insets,
         );
 
         // Draw the blurred backdrop FIRST, in the CURRENT layer, as ONE draw
@@ -382,11 +379,8 @@ impl<'a> From<FrostedContainer<'a>> for Element<'a, Message, Theme, Renderer> {
 pub struct FrostedScrim {
     primitive: VideoPrimitive,
     target_ratio: Option<f32>,
-    top_height: f32,
-    bottom_height: f32,
+    insets: BarInsets,
     cover_blend: f32,
-    bar_top_px: f32,
-    bar_bottom_px: f32,
 }
 
 impl FrostedScrim {
@@ -394,18 +388,14 @@ impl FrostedScrim {
         frame: &Arc<CameraFrame>,
         config: &VideoWidgetConfig,
         target_ratio: Option<f32>,
-        top_height: f32,
-        bottom_height: f32,
+        insets: BarInsets,
     ) -> Self {
         Self {
             // Scrim bars are plain rectangles — no corner rounding.
             primitive: make_primitive(frame, config, 0.0),
             target_ratio,
-            top_height,
-            bottom_height,
+            insets,
             cover_blend: config.cover_blend.unwrap_or(1.0),
-            bar_top_px: config.bar_top_px,
-            bar_bottom_px: config.bar_bottom_px,
         }
     }
 }
@@ -444,21 +434,11 @@ impl Widget<Message, Theme, Renderer> for FrostedScrim {
         // preview's letterbox and so resolve to `letterbox_color` — see the
         // module docs on why that is the intended image rather than something to
         // correct for.
-        self.primitive.update_viewport(
-            bounds.width,
-            bounds.height,
-            self.cover_blend,
-            self.bar_top_px,
-            self.bar_bottom_px,
-        );
+        self.primitive
+            .update_viewport(bounds.width, bounds.height, self.cover_blend, self.insets);
 
-        let frame_rect = frame_rect_on_screen(
-            bounds.width,
-            bounds.height,
-            self.top_height,
-            self.bottom_height,
-            self.target_ratio,
-        );
+        let frame_rect =
+            frame_rect_on_screen(bounds.width, bounds.height, self.insets, self.target_ratio);
 
         // Each `draw_primitive` registers a draw scissored to `bar` (clip_bounds)
         // while the primitive internally overrides the viewport to full-preview
@@ -515,8 +495,7 @@ mod tests {
             zoom_level: 2.5,
             scroll_zoom_enabled: true,
             cover_blend: Some(0.5),
-            bar_top_px: 47.0,
-            bar_bottom_px: 174.0,
+            insets: BarInsets::horizontal(47.0, 174.0),
             letterbox_color: [0.1, 0.2, 0.3, 1.0],
         }
     }

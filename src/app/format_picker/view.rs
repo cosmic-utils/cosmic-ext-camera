@@ -3,7 +3,6 @@
 //! Format picker UI view
 
 use crate::app::overlay_style::{OVERLAY_CONTAINER, PICKER_PANEL};
-use crate::app::preview_geometry::TOP_BAR_HEIGHT;
 use crate::app::state::{AppModel, Message};
 use crate::constants::{formats, ui};
 use crate::fl;
@@ -130,39 +129,27 @@ impl AppModel {
             }
         }
 
-        // Build picker panel with semi-transparent themed background
-        // Uses PICKER_PANEL which caps roundness at "slightly rounded"
-        let picker_panel = self.frosted_panel(
+        // Keep long resolution/FPS rows reachable on compact landscape
+        // windows instead of allowing fixed-width choices to clip off-screen.
+        let picker_content = widget::scrollable(
             widget::Column::new()
                 .push(res_row)
                 .push(widget::space::vertical().height(spacing.space_s))
                 .push(fps_row)
-                .padding(spacing.space_xs)
-                .into(),
-            PICKER_PANEL,
-        );
-
-        // Position picker and add click-outside-to-close
-        let picker_positioned = widget::Row::new()
-            .push(picker_panel)
-            .push(
-                widget::Space::new()
-                    .width(Length::Fill)
-                    .height(Length::Shrink),
-            )
-            .padding([
-                TOP_BAR_HEIGHT as u16 + spacing.space_xs,
-                spacing.space_xs,
-                0,
-                spacing.space_xs,
-            ]);
-
-        widget::mouse_area(
-            widget::container(picker_positioned)
-                .width(Length::Fill)
-                .height(Length::Fill),
+                .padding(spacing.space_xs),
         )
-        .on_press(Message::CloseFormatPicker)
-        .into()
+        .horizontal()
+        .height(crate::app::view::picker_panel_height(
+            self.controls_are_sideways(),
+            self.screen_height,
+        ));
+
+        // Build picker panel with semi-transparent themed background.
+        let picker_panel = self.frosted_panel(picker_content.into(), PICKER_PANEL);
+
+        // Anchor to the top bar's inner edge at its leading (format-button) end -
+        // below it in portrait, off the side bar in landscape - sharing the same
+        // bar-anchor helper as the tools menu and the other pickers.
+        self.anchor_bar_popup_leading(picker_panel, Message::CloseFormatPicker)
     }
 }

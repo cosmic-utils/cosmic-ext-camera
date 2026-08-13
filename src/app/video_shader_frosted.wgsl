@@ -63,6 +63,8 @@ struct ViewportUniform {
     // member here, because a `vec3<f32>` pad would ALSO align to 16 and push
     // itself to 128, taking `content_rect` to 144.
     content_rect: vec4<f32>,
+    bar_left_width: f32,
+    bar_right_width: f32,
 }
 
 @group(0) @binding(2)

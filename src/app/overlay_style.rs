@@ -8,7 +8,7 @@
 //! actually paint the blur; this module decides *what* colour and *which*
 //! rectangles they get.
 
-use crate::app::preview_geometry::{TOP_BAR_HEIGHT, frame_rect_on_screen, scrim_bars};
+use crate::app::preview_geometry::{BarInsets, TOP_BAR_HEIGHT, frame_rect_on_screen, scrim_bars};
 use crate::app::state::{AppModel, CameraMode, Message};
 use crate::config::OverlayEffect;
 use crate::constants::ui::{OVERLAY_BACKGROUND_ALPHA, POPUP_BACKGROUND_ALPHA};
@@ -471,7 +471,7 @@ impl AppModel {
     /// bars now persist for the whole Fill→Fit animation and disappear as it
     /// completes. Fit→Fill is unchanged in spirit: the blend leaves 0.0 on the
     /// first tick, so the bars come back as the transition starts.
-    fn crop_target_ratio(&self) -> Option<f32> {
+    pub(in crate::app) fn crop_target_ratio(&self) -> Option<f32> {
         if self.cover_blend() > 0.0
             && self.mode == CameraMode::Photo
             && !self.current_frame_is_file_source
@@ -520,8 +520,7 @@ impl AppModel {
             frame,
             &config,
             self.crop_target_ratio(),
-            self.top_ui_height(),
-            self.bottom_ui_height(),
+            self.bar_insets(),
         )
         .into()
     }
@@ -547,6 +546,13 @@ impl AppModel {
         // future mode picks an intermediate top height, the alpha will
         // settle at a fractional value and look permanently dimmed. In
         // that case promote `scrim_alpha` to its own `FitFrom` channel.
+        //
+        // Deliberately reads `top_ui_height()` - the raw bar height, still
+        // binary 0/`TOP_BAR_HEIGHT` - NOT `bar_insets().top`, which an aspect
+        // crop grows past `TOP_BAR_HEIGHT` (see `expanded_insets_for_ratio`).
+        // The fade is a chrome signal, the inset is a geometry one; routing the
+        // grown inset here would push `alpha_t` above 1 and clamp the fade to a
+        // hard on/off, so the two channels stay separate.
         let top_h = self.top_ui_height();
         let alpha_t = (top_h / TOP_BAR_HEIGHT).clamp(0.0, 1.0);
         // ...and fade it out with the fit blend, because in **Fit** the bars are
@@ -570,8 +576,7 @@ impl AppModel {
         cosmic::widget::canvas(OverlayBackgroundProgram {
             target_ratio,
             overlay_color,
-            top_height: top_h,
-            bottom_height: self.bottom_ui_height(),
+            insets: self.bar_insets(),
         })
         .width(Length::Fill)
         .height(Length::Fill)
@@ -587,11 +592,9 @@ struct OverlayBackgroundProgram {
     target_ratio: Option<f32>,
     /// Translucent overlay color
     overlay_color: Color,
-    /// Fixed pixel height for the top UI bar
-    top_height: f32,
-    /// Fixed pixel height for the bottom UI controls scrim (matches the
-    /// actual UI footprint, not a fraction of the window).
-    bottom_height: f32,
+    /// Space the UI bars reserve on each edge, honouring the display
+    /// transform (see `AppModel::bar_insets`).
+    insets: BarInsets,
 }
 
 impl cosmic::widget::canvas::Program<Message, cosmic::Theme> for OverlayBackgroundProgram {
@@ -612,13 +615,8 @@ impl cosmic::widget::canvas::Program<Message, cosmic::Theme> for OverlayBackgrou
         // visible inside the crop bars — including when the UI bars are
         // asymmetric and a sensor-centered crop would diverge from the
         // on-screen content area.
-        let frame_rect = frame_rect_on_screen(
-            bounds.width,
-            bounds.height,
-            self.top_height,
-            self.bottom_height,
-            self.target_ratio,
-        );
+        let frame_rect =
+            frame_rect_on_screen(bounds.width, bounds.height, self.insets, self.target_ratio);
 
         for bar in scrim_bars(bounds.size(), frame_rect) {
             if bar.width <= 0.0 || bar.height <= 0.0 {

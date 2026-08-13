@@ -25,6 +25,7 @@
 //! - `Message`: All possible user interactions and system events
 //! - `CameraMode`: Photo or Video capture modes
 
+pub mod bar_layout;
 mod bottom_bar;
 mod camera_ops;
 mod camera_preview;
@@ -440,6 +441,8 @@ impl cosmic::Application for AppModel {
             virtual_camera_file_source: preview_file_source,
             current_frame_is_file_source: has_preview_source,
             current_frame_rotation: crate::backends::camera::types::SensorRotation::None,
+            display_orientation: crate::backends::display_orientation::DisplayOrientation::default(
+            ),
             blur_frame_rotation: crate::backends::camera::types::SensorRotation::None,
             blur_frame_mirror: false,
             blur_frame_zoom: 1.0,
@@ -549,6 +552,11 @@ impl cosmic::Application for AppModel {
                     crate::config::OverlayEffect::Off => fl!("overlay-effect-off"),
                 })
                 .collect(),
+            controls_position_dropdown_options: vec![
+                fl!("controls-position-bottom"),
+                fl!("controls-position-left"),
+                fl!("controls-position-right"),
+            ],
             burst_mode_merge_dropdown_options: vec![
                 fl!("burst-mode-quality"),
                 fl!("burst-mode-fast"),
@@ -1699,6 +1707,27 @@ impl cosmic::Application for AppModel {
             }),
         );
 
+        // Display-orientation subscription: opens a private Wayland
+        // connection on a background thread, reads `wl_output::transform`
+        // and forwards changes as `DisplayOrientationChanged` so the
+        // preview rotation can include the screen's rotation alongside
+        // the sensor mounting.
+        let display_orientation_sub = subscription_with_id(
+            "display_orientation",
+            cosmic::iced::stream::channel(8, async move |mut output| {
+                let mut rx = crate::backends::display_orientation::start();
+                while let Some(orient) = rx.recv().await {
+                    if output
+                        .send(Message::DisplayOrientationChanged(orient))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            }),
+        );
+
         // Translate Wayland keyboard-focus transitions for the camera
         // window into `WindowFocusChanged` messages; the update handler
         // forwards them into the volume_keys backend so we only grab the
@@ -1735,6 +1764,7 @@ impl cosmic::Application for AppModel {
             keybind_sub,
             volume_keys_sub,
             window_focus_sub,
+            display_orientation_sub,
         ])
     }
 

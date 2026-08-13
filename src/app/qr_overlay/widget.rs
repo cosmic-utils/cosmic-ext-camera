@@ -11,7 +11,9 @@ use super::{
     get_action_color, transform_detection_to_screen,
 };
 use crate::app::frame_processor::QrDetection;
+use crate::app::preview_geometry::BarInsets;
 use crate::app::state::Message;
+use crate::backends::camera::types::SensorRotation;
 use cosmic::iced::advanced::widget::{Operation, Tree};
 use cosmic::iced::advanced::{Clipboard, Layout, Shell, Widget, layout, mouse, renderer};
 
@@ -28,10 +30,9 @@ pub struct QrOverlayWidget<'a> {
     /// visible video bounds lerp between the two endpoints by this value
     /// so the QR boxes track the preview through a fit/fill transition.
     cover_blend: f32,
-    /// Animated UI bar heights — needed in Contain mode to know where the
-    /// letterboxed video sits inside the content area.
-    top_bar_h: f32,
-    bottom_bar_h: f32,
+    /// Animated four-sided UI insets and effective preview rotation.
+    insets: BarInsets,
+    rotation: SensorRotation,
     mirrored: bool,
     /// Child button elements (one per detection)
     buttons: Vec<Element<'a, Message, Theme, Renderer>>,
@@ -44,8 +45,8 @@ impl<'a> QrOverlayWidget<'a> {
         frame_width: u32,
         frame_height: u32,
         cover_blend: f32,
-        top_bar_h: f32,
-        bottom_bar_h: f32,
+        insets: BarInsets,
+        rotation: SensorRotation,
         mirrored: bool,
     ) -> Self {
         // Create button elements for each detection
@@ -64,8 +65,8 @@ impl<'a> QrOverlayWidget<'a> {
             frame_width,
             frame_height,
             cover_blend,
-            top_bar_h,
-            bottom_bar_h,
+            insets,
+            rotation,
             mirrored,
             buttons,
         }
@@ -86,6 +87,7 @@ impl<'a> QrOverlayWidget<'a> {
             offset_y,
             video_width,
             video_height,
+            self.rotation,
             self.mirrored,
         );
 
@@ -125,8 +127,8 @@ impl<'a> Widget<Message, Theme, Renderer> for QrOverlayWidget<'a> {
             self.frame_width,
             self.frame_height,
             self.cover_blend,
-            self.top_bar_h,
-            self.bottom_bar_h,
+            self.insets,
+            self.rotation,
         );
 
         // Pre-compute button positions to avoid borrow conflict with iter_mut
@@ -184,8 +186,8 @@ impl<'a> Widget<Message, Theme, Renderer> for QrOverlayWidget<'a> {
             self.frame_width,
             self.frame_height,
             self.cover_blend,
-            self.top_bar_h,
-            self.bottom_bar_h,
+            self.insets,
+            self.rotation,
         );
 
         // Draw QR detection boxes
@@ -196,6 +198,7 @@ impl<'a> Widget<Message, Theme, Renderer> for QrOverlayWidget<'a> {
                 offset_y,
                 video_width,
                 video_height,
+                self.rotation,
                 self.mirrored,
             );
 

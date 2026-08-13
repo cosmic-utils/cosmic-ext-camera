@@ -17,8 +17,10 @@
 pub mod action_button;
 mod widget;
 
-use crate::app::frame_processor::{QrAction, QrDetection};
+use crate::app::frame_processor::{FrameRegion, QrAction, QrDetection};
+use crate::app::preview_geometry::BarInsets;
 use crate::app::state::Message;
+use crate::backends::camera::types::SensorRotation;
 use cosmic::Element;
 use cosmic::iced::{Color, Length};
 
@@ -50,8 +52,8 @@ pub fn build_qr_overlay<'a>(
     frame_width: u32,
     frame_height: u32,
     cover_blend: f32,
-    top_bar_h: f32,
-    bottom_bar_h: f32,
+    insets: BarInsets,
+    rotation: SensorRotation,
     mirrored: bool,
 ) -> Element<'a, Message> {
     if detections.is_empty() {
@@ -66,8 +68,8 @@ pub fn build_qr_overlay<'a>(
         frame_width,
         frame_height,
         cover_blend,
-        top_bar_h,
-        bottom_bar_h,
+        insets,
+        rotation,
         mirrored,
     )
     .into()
@@ -113,9 +115,14 @@ pub fn calculate_video_bounds(
     frame_width: u32,
     frame_height: u32,
     cover_blend: f32,
-    top_bar_h: f32,
-    bottom_bar_h: f32,
+    insets: BarInsets,
+    rotation: SensorRotation,
 ) -> (f32, f32, f32, f32) {
+    let (frame_width, frame_height) = if rotation.swaps_dimensions() {
+        (frame_height, frame_width)
+    } else {
+        (frame_width, frame_height)
+    };
     let frame_aspect = if frame_height > 0 {
         frame_width as f32 / frame_height as f32
     } else {
@@ -146,9 +153,10 @@ pub fn calculate_video_bounds(
 
     // Contain endpoint: letterbox the sensor aspect inside the content area
     // between the UI bars.
-    let content_y = top_bar_h;
-    let content_h = (container_height - top_bar_h - bottom_bar_h).max(0.0);
-    let content_w = container_width;
+    let content_x = insets.left;
+    let content_y = insets.top;
+    let content_h = (container_height - insets.top - insets.bottom).max(0.0);
+    let content_w = (container_width - insets.left - insets.right).max(0.0);
     let contain = if content_h > 0.0 && content_w > 0.0 {
         let content_aspect = content_w / content_h;
         let (vw, vh) = if frame_aspect > content_aspect {
@@ -157,7 +165,7 @@ pub fn calculate_video_bounds(
             (content_h * frame_aspect, content_h)
         };
         (
-            (content_w - vw) / 2.0,
+            content_x + (content_w - vw) / 2.0,
             content_y + (content_h - vh) / 2.0,
             vw,
             vh,
@@ -175,6 +183,38 @@ pub fn calculate_video_bounds(
     )
 }
 
+fn transform_region(
+    bounds: &FrameRegion,
+    rotation: SensorRotation,
+    mirrored: bool,
+) -> (f32, f32, f32, f32) {
+    let (mut x, y, width, height) = match rotation {
+        SensorRotation::None => (bounds.x, bounds.y, bounds.width, bounds.height),
+        SensorRotation::Rotate90 => (
+            bounds.y,
+            1.0 - bounds.x - bounds.width,
+            bounds.height,
+            bounds.width,
+        ),
+        SensorRotation::Rotate180 => (
+            1.0 - bounds.x - bounds.width,
+            1.0 - bounds.y - bounds.height,
+            bounds.width,
+            bounds.height,
+        ),
+        SensorRotation::Rotate270 => (
+            1.0 - bounds.y - bounds.height,
+            bounds.x,
+            bounds.height,
+            bounds.width,
+        ),
+    };
+    if mirrored {
+        x = 1.0 - x - width;
+    }
+    (x, y, width, height)
+}
+
 /// Transform normalized QR detection coordinates to screen coordinates
 pub fn transform_detection_to_screen(
     detection: &QrDetection,
@@ -182,20 +222,16 @@ pub fn transform_detection_to_screen(
     offset_y: f32,
     video_width: f32,
     video_height: f32,
+    rotation: SensorRotation,
     mirrored: bool,
 ) -> (f32, f32, f32, f32) {
-    let bounds = &detection.bounds;
+    let (nx, ny, nw, nh) = transform_region(&detection.bounds, rotation, mirrored);
 
     // Scale from normalized (0-1) to video pixel coordinates
-    let mut x = bounds.x * video_width;
-    let y = bounds.y * video_height;
-    let width = bounds.width * video_width;
-    let height = bounds.height * video_height;
-
-    // Handle mirroring (for front camera selfie mode)
-    if mirrored {
-        x = video_width - x - width;
-    }
+    let x = nx * video_width;
+    let y = ny * video_height;
+    let width = nw * video_width;
+    let height = nh * video_height;
 
     // Add video offset (for letterboxing)
     let mut screen_x = x + offset_x;
@@ -210,4 +246,46 @@ pub fn transform_detection_to_screen(
     screen_y -= (screen_height - height) * 0.5;
 
     (screen_x, screen_y, screen_width, screen_height)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::preview_geometry::BarInsets;
+    use crate::backends::camera::types::SensorRotation;
+
+    #[test]
+    fn contain_bounds_reserve_side_bars() {
+        let (x, y, width, height) = calculate_video_bounds(
+            780.0,
+            313.0,
+            1280,
+            960,
+            0.0,
+            BarInsets {
+                left: 47.0,
+                right: 174.0,
+                ..BarInsets::default()
+            },
+            SensorRotation::None,
+        );
+        assert!(x >= 47.0 && x + width <= 606.01);
+        assert!(y >= 0.0 && y + height <= 313.01);
+    }
+
+    #[test]
+    fn rotated_region_maps_all_four_corners() {
+        let region = crate::app::frame_processor::FrameRegion {
+            x: 0.1,
+            y: 0.2,
+            width: 0.3,
+            height: 0.4,
+        };
+        let cw = transform_region(&region, SensorRotation::Rotate90, false);
+        let ccw = transform_region(&region, SensorRotation::Rotate270, false);
+        assert!((cw.0 - 0.2).abs() < 1e-6 && (cw.1 - 0.6).abs() < 1e-6);
+        assert!((cw.2 - 0.4).abs() < 1e-6 && (cw.3 - 0.3).abs() < 1e-6);
+        assert!((ccw.0 - 0.4).abs() < 1e-6 && (ccw.1 - 0.1).abs() < 1e-6);
+        assert!((ccw.2 - 0.4).abs() < 1e-6 && (ccw.3 - 0.3).abs() < 1e-6);
+    }
 }

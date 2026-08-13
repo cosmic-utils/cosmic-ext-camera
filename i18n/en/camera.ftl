@@ -101,6 +101,11 @@ settings-other = Other
 settings-overlay = Overlay
 # Dropdown label for the light or dark theme choice.
 settings-theme = Theme
+settings-controls-position = Controls position
+settings-controls-position-description = Place the capture controls at the bottom, left, or right edge. Left and right also move the title bar to the opposite edge without rotating the camera preview.
+controls-position-bottom = Bottom
+controls-position-left = Left
+controls-position-right = Right
 # Theme option: follow the desktop light or dark preference.
 match-desktop = Match Desktop
 # Theme option: always dark.

@@ -104,7 +104,18 @@ impl AppModel {
             zoom: self.current_zoom_level(),
         };
         let transforms = frozen.unwrap_or_else(live);
-        let rotation = transforms.rotation.gpu_rotation_code();
+        // Compose the sensor mounting rotation with the compositor's display
+        // transform so the preview reorients when the phone rotates between
+        // portrait and landscape. The sensor's `Rotate*` is the rotation needed
+        // to make the sensor upright when the display is at 0°; display
+        // orientation is the rotation the display itself has from its natural
+        // up. Summing both keeps the image upright relative to the user.
+        //
+        // Composing here rather than at the call site keeps the frosted backdrop
+        // rotating in lockstep with the sharp preview.
+        let rotation = self
+            .preview_adjusted_rotation(transforms.rotation, transforms.mirror)
+            .gpu_rotation_code();
 
         let crop_uv = match self.mode {
             crate::app::state::CameraMode::Photo if !self.current_frame_is_file_source => {
@@ -144,8 +155,7 @@ impl AppModel {
             zoom_level,
             scroll_zoom_enabled,
             cover_blend: Some(cover_blend),
-            bar_top_px: self.top_ui_height(),
-            bar_bottom_px: self.bottom_ui_height(),
+            insets: self.bar_insets(),
             letterbox_color,
         })
     }
@@ -251,6 +261,37 @@ mod tests {
     use crate::app::state::{BurstModeStage, CameraMode};
     use crate::app::video_primitive::{VIDEO_ID_BLUR, VIDEO_ID_FROSTED, VIDEO_ID_NORMAL};
     use crate::app::video_widget::VideoWidgetConfig;
+    use crate::backends::display_orientation::DisplayOrientation;
+
+    #[test]
+    fn preview_adjusted_rotation_keeps_derived_previews_upright() {
+        let m = AppModel {
+            display_orientation: DisplayOrientation::Rotate270,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            m.preview_adjusted_rotation(SensorRotation::Rotate90, true),
+            SensorRotation::None
+        );
+    }
+
+    #[test]
+    fn manual_controls_position_does_not_rotate_preview() {
+        let bottom = AppModel::default();
+        let side = AppModel {
+            config: crate::config::Config {
+                controls_position: crate::config::ControlsPosition::Left,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert_eq!(
+            side.preview_adjusted_rotation(SensorRotation::Rotate90, false),
+            bottom.preview_adjusted_rotation(SensorRotation::Rotate90, false)
+        );
+    }
     use crate::backends::camera::types::{CameraFrame, FrameData, PixelFormat};
     use std::sync::Arc;
 

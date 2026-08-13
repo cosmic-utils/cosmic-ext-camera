@@ -226,12 +226,13 @@ impl AppModel {
         let zoom_level = self.zoom_level;
         let mirror_horizontal = self.should_mirror_captures();
 
-        let rotation = self.current_camera_rotation();
+        let geometry_rotation = self.capture_geometry_rotation();
+        let media_rotation = self.capture_media_rotation();
 
         // Calculate crop rectangle:
         // - Cover mode: crop to screen-visible area, then apply aspect ratio
         // - Fit mode: apply aspect ratio directly on the full frame
-        let (fw, fh) = if rotation.swaps_dimensions() {
+        let (fw, fh) = if geometry_rotation.swaps_dimensions() {
             (frame_arc.height, frame_arc.width)
         } else {
             (frame_arc.width, frame_arc.height)
@@ -252,17 +253,19 @@ impl AppModel {
                     fh,
                     self.screen_width,
                     self.screen_height,
-                    self.settled_top_ui_height(),
-                    self.settled_bottom_ui_height(),
+                    self.settled_bar_insets(),
                     self.photo_aspect_ratio.display_ratio(portrait),
                 )
             };
-            if rotation.swaps_dimensions() {
-                Some((y, x, h, w))
-            } else if x == 0 && y == 0 && w == fw && h == fh {
+            if x == 0 && y == 0 && w == fw && h == fh {
                 None
             } else {
-                Some((x, y, w, h))
+                Some(crate::app::preview_geometry::inverse_oriented_crop(
+                    (x, y, w, h),
+                    frame_arc.width,
+                    frame_arc.height,
+                    geometry_rotation,
+                ))
             }
         };
 
@@ -281,7 +284,7 @@ impl AppModel {
                     filter_type,
                     crop_rect,
                     zoom_level,
-                    rotation,
+                    rotation: media_rotation,
                     mirror_horizontal,
                     ..Default::default()
                 };
@@ -319,7 +322,8 @@ impl AppModel {
         let zoom_level = self.zoom_level;
         let mirror_horizontal = self.should_mirror_captures();
 
-        let rotation = self.current_camera_rotation();
+        let geometry_rotation = self.capture_geometry_rotation();
+        let media_rotation = self.capture_media_rotation();
 
         // For raw stream capture, use native aspect ratio (no crop from preview)
         // The raw frame may have a different aspect ratio than the preview.
@@ -332,8 +336,7 @@ impl AppModel {
         let portrait = self.screen_is_portrait();
         let cover_screen_w = self.screen_width;
         let cover_screen_h = self.screen_height;
-        let cover_top_h = self.settled_top_ui_height();
-        let cover_bottom_h = self.settled_bottom_ui_height();
+        let cover_insets = self.settled_bar_insets();
         let cover_target_ratio = self.photo_aspect_ratio.display_ratio(portrait);
 
         let encoding_format: crate::pipelines::photo::EncodingFormat =
@@ -361,7 +364,7 @@ impl AppModel {
                     "Raw frame captured from still stream"
                 );
 
-                let (rw, rh) = if rotation.swaps_dimensions() {
+                let (rw, rh) = if geometry_rotation.swaps_dimensions() {
                     (frame.height, frame.width)
                 } else {
                     (frame.width, frame.height)
@@ -375,17 +378,19 @@ impl AppModel {
                             rh,
                             cover_screen_w,
                             cover_screen_h,
-                            cover_top_h,
-                            cover_bottom_h,
+                            cover_insets,
                             cover_target_ratio,
                         )
                     };
-                    if rotation.swaps_dimensions() {
-                        Some((y, x, h, w))
-                    } else if x == 0 && y == 0 && w == rw && h == rh {
+                    if x == 0 && y == 0 && w == rw && h == rh {
                         None
                     } else {
-                        Some((x, y, w, h))
+                        Some(crate::app::preview_geometry::inverse_oriented_crop(
+                            (x, y, w, h),
+                            frame.width,
+                            frame.height,
+                            geometry_rotation,
+                        ))
                     }
                 };
 
@@ -393,7 +398,7 @@ impl AppModel {
                     filter_type,
                     crop_rect,
                     zoom_level,
-                    rotation,
+                    rotation: media_rotation,
                     mirror_horizontal,
                     ..Default::default()
                 };
@@ -603,7 +608,8 @@ impl AppModel {
 
         let camera_metadata = self.build_camera_metadata();
 
-        let rotation = self.current_camera_rotation();
+        let geometry_rotation = self.capture_geometry_rotation();
+        let media_rotation = self.capture_media_rotation();
 
         // Calculate crop rectangle based on preview mode and aspect ratio.
         // Cover-mode crop is computed by inverse-mapping the on-screen
@@ -611,7 +617,7 @@ impl AppModel {
         // saved photo matches what the user sees inside the crop bars.
         let portrait = self.screen_is_portrait();
         let crop_rect = if let Some(frame) = frames.first() {
-            let (rw, rh) = if rotation.swaps_dimensions() {
+            let (rw, rh) = if geometry_rotation.swaps_dimensions() {
                 (frame.height, frame.width)
             } else {
                 (frame.width, frame.height)
@@ -624,17 +630,19 @@ impl AppModel {
                     rh,
                     self.screen_width,
                     self.screen_height,
-                    self.settled_top_ui_height(),
-                    self.settled_bottom_ui_height(),
+                    self.settled_bar_insets(),
                     self.photo_aspect_ratio.display_ratio(portrait),
                 )
             };
-            if rotation.swaps_dimensions() {
-                Some((y, x, h, w))
-            } else if x == 0 && y == 0 && w == rw && h == rh {
+            if x == 0 && y == 0 && w == rw && h == rh {
                 None
             } else {
-                Some((x, y, w, h))
+                Some(crate::app::preview_geometry::inverse_oriented_crop(
+                    (x, y, w, h),
+                    frame.width,
+                    frame.height,
+                    geometry_rotation,
+                ))
             }
         } else {
             None
@@ -646,7 +654,7 @@ impl AppModel {
         config.encoding_format = encoding_format;
         config.camera_metadata = camera_metadata;
         config.save_burst_raw_dng = self.config.save_burst_raw;
-        config.rotation = rotation;
+        config.rotation = media_rotation;
         config.mirror_horizontal = self.should_mirror_captures();
 
         // Calculate adaptive processing parameters based on scene brightness
@@ -1390,7 +1398,6 @@ impl AppModel {
             return Task::none();
         }
 
-        let camera = &self.available_cameras[self.current_camera_index];
         let format = self.active_format.as_ref().unwrap();
 
         let timestamp = chrono::Local::now().format("%Y%m%d_%H%M%S_%3f");
@@ -1403,7 +1410,9 @@ impl AppModel {
             "Starting quick-record (long-press in Photo mode)"
         );
 
-        let sensor_rotation = camera.rotation;
+        // Snapshot the physical device orientation at recording start so the
+        // resulting video is upright and remains stable for the whole session.
+        let sensor_rotation = self.capture_media_rotation();
         let framerate = format.framerate.map(|f| f.as_int()).unwrap_or(30);
 
         // Use viewfinder frame dimensions (not raw format dimensions)
@@ -1488,7 +1497,9 @@ impl AppModel {
             self.turn_on_flash_hardware();
         }
 
-        let sensor_rotation = camera.rotation;
+        // Snapshot the physical device orientation at recording start so the
+        // resulting video is upright and remains stable for the whole session.
+        let sensor_rotation = self.capture_media_rotation();
         let width = format.width;
         let height = format.height;
         let framerate = format.framerate.map(|f| f.as_int()).unwrap_or(30);
@@ -1961,7 +1972,7 @@ impl AppModel {
             .unwrap_or((1920, 1080));
         let bitrate_kbps = Some(self.config.bitrate_preset.bitrate_kbps(w, h));
         let live_filter_code = Arc::clone(&self.recording_filter_code);
-        let rotation = self.current_camera_rotation();
+        let rotation = self.capture_media_rotation();
         let mirror_horizontal = self.should_mirror_captures();
 
         // Spawn the encoder task — it runs until the channel is closed

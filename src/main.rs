@@ -7,6 +7,9 @@ use std::path::PathBuf;
 
 mod cli;
 
+const WINDOW_MIN_WIDTH: f32 = 360.0;
+const WINDOW_MIN_HEIGHT: f32 = 180.0;
+
 #[derive(Parser)]
 #[command(name = "camera")]
 #[command(about = "Modern camera app for Linux desktops and phones")]
@@ -249,8 +252,8 @@ fn run_gui(
     // Settings for configuring the application window and iced runtime.
     let mut settings = cosmic::app::Settings::default().size_limits(
         cosmic::iced::Limits::NONE
-            .min_width(360.0)
-            .min_height(360.0),
+            .min_width(WINDOW_MIN_WIDTH)
+            .min_height(WINDOW_MIN_HEIGHT),
     );
 
     // When a preview source is provided, set a fixed window size — defaults

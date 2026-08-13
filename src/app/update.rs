@@ -222,6 +222,12 @@ impl AppModel {
                 crate::backends::volume_keys::set_focused(focused);
                 Task::none()
             }
+            Message::DisplayOrientationChanged(orientation) => {
+                // Backend already logs at info on the dedupe boundary; keep
+                // the update path silent to avoid double-logging.
+                self.display_orientation = orientation;
+                Task::none()
+            }
             Message::WindowClose => self.handle_window_close(),
             Message::WindowMinimize => self.core.minimize(None),
             Message::WindowToggleMaximize => self.core.toggle_maximize(None),
@@ -287,6 +293,7 @@ impl AppModel {
             Message::UpdateConfig(config) => self.handle_update_config(config),
             Message::SetAppTheme(index) => self.handle_set_app_theme(index),
             Message::SetOverlayEffect(index) => self.handle_set_overlay_effect(index),
+            Message::SetControlsPosition(index) => self.handle_set_controls_position(index),
             Message::SelectDefaultMode(index) => self.handle_select_default_mode(index),
             Message::PortalColorSchemeChanged(is_dark) => {
                 self.handle_portal_color_scheme_changed(is_dark)

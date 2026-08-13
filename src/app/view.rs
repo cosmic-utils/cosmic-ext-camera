@@ -9,6 +9,7 @@
 //! - Bottom bar (bottom_bar module)
 //! - Format picker overlay (format_picker module)
 
+use crate::app::bar_layout::{Edge, bar_cross_lengths, sideways_column_reverses};
 use crate::app::bottom_bar::slide_h::SlideH;
 use crate::app::overlay_style::{
     OVERLAY_CONTAINER, PICKER_PANEL, POPUP_PANEL, overlay_chip_button_class, window_bg_style,
@@ -24,6 +25,82 @@ use cosmic::iced::{Alignment, Background, Color, Length};
 use cosmic::widget::{self, icon};
 use std::sync::atomic::{AtomicBool, Ordering};
 use tracing::info;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FitZoomLayout {
+    Inline,
+    FloatUpright,
+}
+
+fn fit_zoom_layout(sideways: bool) -> FitZoomLayout {
+    if sideways {
+        FitZoomLayout::FloatUpright
+    } else {
+        FitZoomLayout::Inline
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum VideoProgressPlacement {
+    AboveCapture,
+    AboveSideLanes,
+}
+
+fn video_progress_placement(sideways: bool) -> VideoProgressPlacement {
+    if sideways {
+        VideoProgressPlacement::AboveSideLanes
+    } else {
+        VideoProgressPlacement::AboveCapture
+    }
+}
+
+pub(crate) fn picker_panel_height(sideways: bool, screen_height: f32) -> Length {
+    const COMPACT_SIDE_HEIGHT_MAX: f32 = 480.0;
+    if sideways && screen_height > 0.0 && screen_height <= COMPACT_SIDE_HEIGHT_MAX {
+        let gap = f32::from(cosmic::theme::spacing().space_xs) * 2.0;
+        Length::Fixed((screen_height - gap).max(0.0))
+    } else {
+        Length::Shrink
+    }
+}
+
+fn overlay_popup_padding(model: &AppModel) -> [f32; 4] {
+    let insets = AppModel::map_bar_insets(
+        model.controls_bar_layout(),
+        model.top_ui_height(),
+        model.bottom_ui_height(),
+    );
+    if model.controls_are_sideways() {
+        let chip_extent = model.zoom_chip_strip_height();
+        let (right, left) = match model.controls_bar_layout().bottom_bar {
+            Edge::Right => (insets.right + chip_extent, insets.left),
+            Edge::Left => (insets.right, insets.left + chip_extent),
+            _ => (insets.right, insets.left),
+        };
+        [insets.top, right, insets.bottom, left]
+    } else {
+        [
+            insets.top,
+            insets.right,
+            insets.bottom + model.zoom_chip_strip_height(),
+            insets.left,
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FitZoomAxis {
+    Horizontal,
+    Vertical,
+}
+
+fn fit_zoom_axis(sideways: bool) -> FitZoomAxis {
+    if sideways {
+        FitZoomAxis::Vertical
+    } else {
+        FitZoomAxis::Horizontal
+    }
+}
 
 /// Flash icon SVG (lightning bolt)
 const FLASH_ICON: &[u8] = include_bytes!("../../resources/button_icons/flash.svg");
@@ -166,6 +243,120 @@ impl AppModel {
             + (target - anim.from.bottom_ui_height) * self.fit_animation_eased()
     }
 
+    /// Space the UI bars reserve on each edge, honouring the display transform.
+    ///
+    /// The bar *extents* are unchanged by rotation - a bar is the same thickness
+    /// whichever edge it sits on - so this reuses the existing animated heights
+    /// and only decides which edges they land on.
+    pub fn bar_insets(&self) -> crate::app::preview_geometry::BarInsets {
+        let layout = self.controls_bar_layout();
+        let base = Self::map_bar_insets(layout, self.top_ui_height(), self.bottom_ui_height());
+        // When an aspect crop letterboxes onto a bar, grow that bar out to the
+        // kept rect so the scrim doesn't leave a control-free tinted band
+        // beside the bar. Uses the SAME animated ratio the scrim/frost/preview
+        // frame with, so all three keep describing one rectangle. `None`
+        // (Native, or non-Photo) leaves `base` untouched → portrait unchanged.
+        crate::app::preview_geometry::expanded_insets_for_ratio(
+            base,
+            self.screen_width,
+            self.screen_height,
+            self.crop_target_ratio(),
+        )
+    }
+
+    /// [`Self::bar_insets`], but from the SETTLED bar heights rather than the
+    /// animated ones.
+    ///
+    /// Used by the capture path: a shot taken mid-animation must crop against
+    /// where the bars will land, not an in-flight value (see
+    /// `settled_bottom_ui_height`'s docs).
+    pub fn settled_bar_insets(&self) -> crate::app::preview_geometry::BarInsets {
+        let layout = self.controls_bar_layout();
+        let base = Self::map_bar_insets(
+            layout,
+            self.settled_top_ui_height(),
+            self.settled_bottom_ui_height(),
+        );
+        // Match the capture path's crop: `cover_capture_crop` is fed
+        // `display_ratio(portrait)`, so expand against the same ratio. Because
+        // expanding then re-framing with that ratio reproduces the identical
+        // kept rect, the saved crop is unchanged - only the reserved-bar
+        // bookkeeping grows (guarded by
+        // `cover_capture_crop_follows_the_screen_not_the_sensor_centre`, which
+        // calls the crop with base insets directly).
+        crate::app::preview_geometry::expanded_insets_for_ratio(
+            base,
+            self.screen_width,
+            self.screen_height,
+            self.settled_crop_target_ratio(),
+        )
+    }
+
+    /// The aspect ratio the SETTLED capture path crops against, or `None` when
+    /// no crop applies. This is EXACTLY the ratio every `cover_capture_crop`
+    /// call site in `capture.rs` is handed: `display_ratio(portrait)` in the
+    /// Cover branch, and nothing at all in the fit-to-view branch (where the
+    /// crop is sensor-space and the insets are irrelevant). Keeping the two in
+    /// lockstep is what makes the expansion crop-preserving - expand with ratio
+    /// R, then `cover_capture_crop` re-frames with the same R and lands the
+    /// identical kept rect.
+    fn settled_crop_target_ratio(&self) -> Option<f32> {
+        if self.preview_fit_to_view {
+            None
+        } else {
+            self.photo_aspect_ratio
+                .display_ratio(self.screen_is_portrait())
+        }
+    }
+
+    /// Places the top/bottom bar extents onto whichever edges `layout` puts
+    /// them on. Single source of truth shared by [`Self::bar_insets`] and
+    /// [`Self::settled_bar_insets`] so the edge mapping cannot drift between
+    /// the animated and settled variants.
+    fn map_bar_insets(
+        layout: crate::app::bar_layout::BarLayout,
+        top: f32,
+        bottom: f32,
+    ) -> crate::app::preview_geometry::BarInsets {
+        use crate::app::bar_layout::Edge;
+        use crate::app::preview_geometry::BarInsets;
+
+        match (layout.top_bar, layout.bottom_bar) {
+            (Edge::Left, Edge::Right) => BarInsets::vertical(top, bottom),
+            (Edge::Right, Edge::Left) => BarInsets::vertical(bottom, top),
+            _ => BarInsets::horizontal(top, bottom),
+        }
+    }
+
+    /// Wrap `bar` in a container pinned to `edge`.
+    ///
+    /// Fills the whole stack layer, then aligns the (already sized) bar
+    /// against the requested edge. The bar's own container decides its
+    /// extent on the cross axis (e.g. `build_top_bar` / `build_bottom_bar`
+    /// switch between `Fixed` and `Fill` based on
+    /// `bar_layout::is_sideways`); this helper only decides *where* that
+    /// extent lands.
+    fn pin_to_edge<'a>(
+        &self,
+        bar: Element<'a, Message>,
+        edge: crate::app::bar_layout::Edge,
+    ) -> Element<'a, Message> {
+        use crate::app::bar_layout::Edge;
+        use cosmic::iced::alignment::{Horizontal, Vertical};
+
+        let c = widget::container(bar)
+            .width(Length::Fill)
+            .height(Length::Fill);
+
+        match edge {
+            Edge::Top => c.align_y(Vertical::Top).align_x(Horizontal::Center),
+            Edge::Bottom => c.align_y(Vertical::Bottom).align_x(Horizontal::Center),
+            Edge::Left => c.align_x(Horizontal::Left).align_y(Vertical::Center),
+            Edge::Right => c.align_x(Horizontal::Right).align_y(Vertical::Center),
+        }
+        .into()
+    }
+
     /// Settled height of the empty placeholder above the bottom bar. 0 in
     /// View (no capture button — fit/zoom row sits flush above the
     /// carousel) and while the chrome is hidden; the capture button area
@@ -279,12 +470,7 @@ fn build_overlay_popup<'a>(
     widget::container(popup_box)
         .width(Length::Fill)
         .height(Length::Fill)
-        .padding([
-            model.top_ui_height(),
-            0.0,
-            model.bottom_ui_height() + model.zoom_chip_strip_height(),
-            0.0,
-        ])
+        .padding(overlay_popup_padding(model))
         .align_x(cosmic::iced::alignment::Horizontal::Center)
         .align_y(cosmic::iced::alignment::Vertical::Center)
         .into()
@@ -521,15 +707,23 @@ impl AppModel {
         let play_pause_button = self.build_video_play_pause_button();
         let has_video_controls = play_pause_button.is_some();
 
-        let capture_button_only = if (self.recording.is_recording()
-            && !self.quick_record.is_recording())
-            || self.virtual_camera.is_streaming()
-        {
+        // Held sideways the bars move to the side edges; the capture area is a
+        // narrow (~100px) vertical lane, so the recording three-slot layout
+        // stacks into a Column instead of the portrait Row.
+        let sideways = self.controls_are_sideways();
+        // The recording/streaming state that replaces the single capture button
+        // with the [play·stop·photo] three-slot layout.
+        let recording_layout = (self.recording.is_recording() && !self.quick_record.is_recording())
+            || self.virtual_camera.is_streaming();
+
+        let capture_button_only = if recording_layout {
             // Mirror the bottom bar's three-column layout so the stop circle
             // sits where the carousel does and the photo button lines up with
-            // the camera-switch position. `three_col_row` is the shared shape;
-            // the side spacer width and center container width must match the
-            // bottom bar's gallery/switch buttons and carousel width.
+            // the camera-switch position. Portrait uses `three_col_row` (the
+            // shared shape); sideways stacks the same three slots into a Column
+            // that fits the narrow strip. The side spacer width and center
+            // container width match the bottom bar's gallery/switch buttons and
+            // carousel width.
             let stop_circle = self.build_capture_circle();
             let photo_button = self.build_photo_during_recording_button();
             let slide = std::sync::Arc::clone(&self.carousel_button_slide);
@@ -556,27 +750,49 @@ impl AppModel {
                     .height(Length::Shrink)
                     .into()
             };
+            let center_slot: Element<'_, Message> = widget::container(stop_circle)
+                .width(Length::Fixed(center_width))
+                .center_x(center_width)
+                .into();
 
-            // Vertical padding matches build_capture_button so the circle
-            // doesn't shift when the layout flips between idle and recording.
-            crate::app::bottom_bar::three_col_row(
-                left_slot,
-                // Wrap the center container in a SlidePrimer so it publishes the
-                // resting carousel slide (from its own bounds) into the shared
-                // atomic. During recording the carousel isn't in the tree, so
-                // without this the photo button's SlideH would read a stale/zero
-                // offset — the misplacement seen in spoofed preview screenshots.
-                crate::app::bottom_bar::slide_h::SlidePrimer::new(
-                    widget::container(stop_circle)
-                        .width(Length::Fixed(center_width))
-                        .center_x(center_width)
-                        .into(),
-                    std::sync::Arc::clone(&self.carousel_button_slide),
+            if sideways {
+                // Same three slots as portrait, stacked to fit the vertical
+                // strip. Mirror-aware: a rotate-left (270°/Ccw90) turn reverses
+                // the column so the stop circle keeps mirroring the carousel
+                // (whose labels already flip bottom↔top there); rotate-right
+                // (90°) keeps portrait order. See `sideways_column_reverses`.
+                let photo_slot: Element<'_, Message> = widget::container(photo_button)
+                    .width(Length::Fixed(side_width))
+                    .center_x(side_width)
+                    .into();
+                let mut slots: Vec<Element<'_, Message>> = vec![left_slot, center_slot, photo_slot];
+                if sideways_column_reverses(self.controls_bar_layout().quarter) {
+                    slots.reverse();
+                }
+                widget::Column::with_children(slots)
+                    .align_x(cosmic::iced::alignment::Horizontal::Center)
+                    .spacing(spacing.space_m)
+                    .width(Length::Fill)
+                    .into()
+            } else {
+                // Vertical padding matches build_capture_button so the circle
+                // doesn't shift when the layout flips between idle and recording.
+                crate::app::bottom_bar::three_col_row(
+                    left_slot,
+                    // Wrap the center container in a SlidePrimer so it publishes the
+                    // resting carousel slide (from its own bounds) into the shared
+                    // atomic. During recording the carousel isn't in the tree, so
+                    // without this the photo button's SlideH would read a stale/zero
+                    // offset - the misplacement seen in spoofed preview screenshots.
+                    crate::app::bottom_bar::slide_h::SlidePrimer::new(
+                        center_slot,
+                        std::sync::Arc::clone(&self.carousel_button_slide),
+                    )
+                    .into(),
+                    SlideH::new(photo_button, slide, -1.0).into(),
+                    [spacing.space_xs, spacing.space_m],
                 )
-                .into(),
-                SlideH::new(photo_button, slide, -1.0).into(),
-                [spacing.space_xs, spacing.space_m],
-            )
+            }
         } else if has_video_controls {
             // Video file selected but not streaming: show play button + capture button
             let capture_button = self.build_capture_button();
@@ -639,11 +855,15 @@ impl AppModel {
         } else {
             capture_button_only
         };
-        let capture_button_area: Element<'_, Message> = widget::container(inner)
-            .width(Length::Fill)
-            .height(Length::Fixed(capture_h.max(0.0)))
-            .clip(true)
-            .into();
+        // Portrait always pins the lane to `capture_h` (drives the View↔Photo
+        // collapse animation). Sideways, the taller stacked recording Column
+        // needs to size to its own content instead of being clipped to the
+        // ~100px lane - see `capture_area_height_is_fixed`.
+        let mut capture_area = widget::container(inner).width(Length::Fill).clip(true);
+        if crate::app::bar_layout::capture_area_height_is_fixed(sideways, recording_layout) {
+            capture_area = capture_area.height(Length::Fixed(capture_h.max(0.0)));
+        }
+        let capture_button_area: Element<'_, Message> = capture_area.into();
 
         // Bottom area: always show bottom bar (filter picker is now a sidebar
         // overlay). Skipped entirely while the chrome is hidden — the column
@@ -663,79 +883,169 @@ impl AppModel {
             let spacing = cosmic::theme::spacing();
             let control_spacing = spacing.space_xs;
 
-            let mut bottom_controls = widget::Column::new().width(Length::Fill);
+            // Which edge each bar lands on for the current display transform.
+            // The window itself never rotates, so this is the single place
+            // that decides "top bar" and "bottom bar" mean physically-left,
+            // -right, -top or -bottom.
+            let layout = self.controls_bar_layout();
 
             // Hidden chrome: the whole bottom column collapses — no progress
             // bar, no capture button, no carousel. `show_zoom_label` above
             // already dropped the fit/zoom chips, so the bottom stack child
             // becomes an empty layer over the preview.
-            if !self.ui_hidden {
-                if let Some(progress_bar) = self.build_video_progress_bar() {
-                    bottom_controls = bottom_controls.push(progress_bar);
+            //
+            // Portrait: the capture button sits above the
+            // [gallery · carousel · switcher] group, which is a row below it.
+            // Sideways: the same relationship rotated 90° - the capture button
+            // and the group sit SIDE BY SIDE across the strip's width (each
+            // centred along the strip's length), rather than stacked one after
+            // the other down the strip. The capture stays on the preview-facing
+            // (inner) side; which physical side that is depends on the strip
+            // edge, so the two lanes mirror between 270° and 90°.
+            let video_progress_bar = self.build_video_progress_bar();
+            let bottom_controls: Element<'_, Message> = if self.ui_hidden {
+                widget::Space::new()
+                    .width(Length::Fill)
+                    .height(Length::Shrink)
+                    .into()
+            } else if sideways {
+                use crate::app::bar_layout::Edge;
+                // Capture lane takes the strip width minus the bar-lane
+                // (SIDEWAYS_STRIP_WIDTH - BOTTOM_BAR_HEIGHT); the group lane
+                // fills the rest. Both run the full strip length and centre
+                // their content along it.
+                //
+                // The row carries `align_y(Center)`. Without it the row's
+                // cross-axis defaults to `Start`, so a group lane that resolves
+                // to its compact content height (the gallery / carousel /
+                // switcher stack ≈ its own height, not the full strip) is
+                // pinned to the TOP of the strip, while the capture lane - whose
+                // content is a fixed ~100px area that its own `center_y` already
+                // parks in the middle - still reads as centred. That mismatch is
+                // the "capture centred, group jammed to the top" bug. Centring
+                // the row's cross axis parks the compact group in the middle of
+                // the strip alongside the capture button, and is applied in the
+                // flex alignment pass regardless of how each lane's height
+                // resolves (it is a no-op for a lane that already fills the
+                // strip, so the capture lane is unaffected).
+                // Both lanes are Shrink (their compact content height); the row
+                // height resolves to the taller lane (the group), and
+                // `align_y(Center)` parks the shorter capture lane at its centre.
+                // Keeping the whole cluster COMPACT (not Fill) lets
+                // `pin_to_edge`'s own vertical centring place it at the window's
+                // middle. Filling the strip height here instead hit iced's flex
+                // `compression` fallback and settled the cluster ~70px low.
+                let capture_lane = widget::container(capture_button_area)
+                    .width(Length::Fixed(
+                        crate::app::bar_layout::SIDEWAYS_STRIP_WIDTH
+                            - crate::app::bottom_bar::BOTTOM_BAR_HEIGHT,
+                    ))
+                    .center_x(Length::Fill);
+                let group_lane = widget::container(bottom_area).width(Length::Fill);
+                let row = widget::Row::new()
+                    .width(Length::Fill)
+                    .align_y(cosmic::iced::alignment::Vertical::Center);
+                let lanes: Element<'_, Message> = if layout.bottom_bar == Edge::Right {
+                    // Strip on the right: inner (preview) edge is the left →
+                    // capture on the left, group toward the screen edge.
+                    row.push(capture_lane).push(group_lane)
+                } else {
+                    // Strip on the left (mirror): capture on the right (inner).
+                    row.push(group_lane).push(capture_lane)
                 }
+                .into();
 
-                bottom_controls = bottom_controls.push(capture_button_area).push(bottom_area);
-            }
+                let mut side_controls = widget::Column::new().width(Length::Fill);
+                if video_progress_placement(sideways) == VideoProgressPlacement::AboveSideLanes
+                    && let Some(progress_bar) = video_progress_bar
+                {
+                    side_controls = side_controls.push(progress_bar);
+                }
+                side_controls.push(lanes).into()
+            } else {
+                let mut col = widget::Column::new().width(Length::Fill);
+                if video_progress_placement(sideways) == VideoProgressPlacement::AboveCapture
+                    && let Some(progress_bar) = video_progress_bar
+                {
+                    col = col.push(progress_bar);
+                }
+                col.push(capture_button_area).push(bottom_area).into()
+            };
 
-            // Bottom section: zoom label + bottom controls
+            // Bottom section: zoom label + bottom controls.
+            //
+            // Sideways, this is the whole right-pinned control strip: it
+            // moves from window-width to a fixed strip width
+            // (`SIDEWAYS_STRIP_WIDTH`) and carries the `Fill` height itself -
+            // the strip runs the full length of its edge - while its
+            // children (the fit/zoom chips, capture button, and bottom bar)
+            // stay `Shrink` and stack along it in the same order as portrait.
             let mut bottom_section = widget::Column::new().width(Length::Fill);
-
-            // Hide the fit/zoom row while the tools menu is open so the two
-            // don't visually compete — the menu itself is shown as an overlay.
-            if show_zoom_label && !self.tools_menu_visible {
-                let fit_icon_name = if self.preview_fit_to_view {
-                    "view-fullscreen-symbolic"
-                } else {
-                    "view-restore-symbolic"
-                };
-                let fit_button_inner = widget::button::custom(
-                    widget::Row::new()
-                        .push(
-                            widget::icon::from_name(fit_icon_name)
-                                .symbolic(true)
-                                .size(16),
-                        )
-                        .padding([0, spacing.space_s])
-                        .height(Length::Fixed(spacing.space_l.into()))
-                        .align_y(Alignment::Center),
-                )
-                .padding(0)
-                .on_press(Message::TogglePreviewFit)
-                .class(if self.preview_fit_to_view {
-                    cosmic::theme::Button::Suggested
-                } else {
-                    overlay_chip_button_class()
-                });
-                // Inactive: frosted like the top/bottom bars so the button sits
-                // on a matching surface. Active: keep the Suggested (accent)
-                // fill so toggle state stays visible.
-                let fit_button: Element<'_, Message> = if self.preview_fit_to_view {
-                    fit_button_inner.into()
-                } else {
-                    self.frosted_panel(fit_button_inner.into(), OVERLAY_CONTAINER)
-                };
-
-                let zoom_row = widget::Row::new()
-                    .push(fit_button)
-                    .push(widget::space::horizontal().width(Length::Fixed(8.0)))
-                    .push(self.build_zoom_label())
-                    .align_y(Alignment::Center);
-
-                bottom_section = bottom_section.push(
-                    widget::container(zoom_row)
-                        .width(Length::Fill)
-                        .center_x(Length::Fill)
-                        .padding([0, 0, control_spacing, 0]),
-                );
+            if sideways {
+                use cosmic::iced::alignment::Horizontal;
+                bottom_section = bottom_section
+                    .width(Length::Fixed(crate::app::bar_layout::SIDEWAYS_STRIP_WIDTH))
+                    .height(Length::Shrink)
+                    .align_x(Horizontal::Center);
             }
 
-            bottom_section = bottom_section.push(bottom_controls);
+            // Fit/zoom chips. Hidden while the tools menu is open so the two
+            // don't visually compete — the menu itself is shown as an overlay.
+            //
+            // Portrait: stacked into the strip (`bottom_section`) just above the
+            // capture button, byte-identical to before. Sideways (decision
+            // D4-B): pulled OUT of the strip and floated over the preview
+            // against the strip's INNER edge, vertically centred - returned as a
+            // separate stack layer (`sideways_chip_layer`) added over the
+            // preview below, mirrored per rotation.
+            let sideways_chip_layer: Option<Element<'_, Message>> = if show_zoom_label
+                && !self.tools_menu_visible
+            {
+                match fit_zoom_layout(sideways) {
+                    FitZoomLayout::FloatUpright => Some(self.float_chips_over_preview(
+                        self.build_fit_zoom_group(fit_zoom_axis(sideways)),
+                        layout.bottom_bar,
+                    )),
+                    FitZoomLayout::Inline => {
+                        bottom_section = bottom_section.push(
+                            widget::container(self.build_fit_zoom_group(fit_zoom_axis(sideways)))
+                                .width(Length::Fill)
+                                .center_x(Length::Fill)
+                                .padding([0, 0, control_spacing, 0]),
+                        );
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            // Sideways, `bottom_controls` is itself a Fill-height Row whose two
+            // lanes centre their content along the strip, so pushing it directly
+            // into the Fill-height strip already centres the capture+group.
+            // Portrait pushes the Shrink Column as before.
+            // Sideways, the centred cluster settles noticeably LOW: the region
+            // pin_to_edge centres within sits below the visible strip's middle
+            // (a compositor/window vertical-inset interaction the widget layout
+            // can't see). Lift the cluster with a trailing spacer so it reads
+            // centred on the strip. Tuned against on-device screenshots; may need
+            // adjusting if the panel insets differ on another device.
+            if sideways {
+                bottom_section = bottom_section
+                    .push(bottom_controls)
+                    .push(widget::Space::new().height(Length::Fixed(0.0)));
+            } else {
+                bottom_section = bottom_section.push(bottom_controls);
+            }
 
             // The shader handles the Cover/Contain blend via cover_blend(), so
             // the preview always uses Cover layout (fills the window).  The shader
             // zooms out to show the full frame in Contain mode, with transparent
             // letterbox areas.
             let camera_layer: Element<'_, Message> = camera_preview;
+
+            let top_bar_layer = self.pin_to_edge(top_bar, layout.top_bar);
+            let bottom_bar_layer = self.pin_to_edge(bottom_section.into(), layout.bottom_bar);
 
             let mut main_stack = cosmic::iced::widget::stack![
                 camera_layer,
@@ -744,14 +1054,16 @@ impl AppModel {
                 self.build_composition_overlay(),
                 self.build_qr_overlay(),
                 self.build_privacy_warning(),
-                widget::container(top_bar)
-                    .width(Length::Fill)
-                    .align_y(cosmic::iced::alignment::Vertical::Top),
-                widget::container(bottom_section)
-                    .width(Length::Fill)
-                    .height(Length::Fill)
-                    .align_y(cosmic::iced::alignment::Vertical::Bottom)
+                top_bar_layer,
+                bottom_bar_layer
             ];
+
+            // Sideways only: the fit/zoom chips float over the preview against
+            // the strip's inner edge (see `sideways_chip_layer` above). Layered
+            // over the bars but under the modal popups pushed below.
+            if let Some(chip_layer) = sideways_chip_layer {
+                main_stack = main_stack.push(chip_layer);
+            }
 
             if self.flash.error_popup.is_some() {
                 main_stack = main_stack.push(self.build_flash_error_popup());
@@ -820,6 +1132,23 @@ impl AppModel {
         (self.screen_width - (360.0 + 8.0)).clamp(344.0, 480.0)
     }
 
+    /// Reserve vertical title-bar space only while the title bar is horizontal.
+    fn context_drawer_top_inset(layout: crate::app::bar_layout::BarLayout) -> f32 {
+        if layout.quarter != crate::app::bar_layout::Quarter::None {
+            0.0
+        } else {
+            TOP_BAR_HEIGHT
+        }
+    }
+
+    /// Keep drawers on their standard right edge unless automatic display
+    /// orientation moved the vertical title bar there. A manual control-bar
+    /// position must not move drawers along with it.
+    fn context_drawer_aligns_right(&self, layout: crate::app::bar_layout::BarLayout) -> bool {
+        self.config.controls_position != crate::config::ControlsPosition::Bottom
+            || layout.top_bar != crate::app::bar_layout::Edge::Right
+    }
+
     /// Build the context drawer (Settings, Filters, Insights, Shortcuts) as a
     /// view-level overlay.
     ///
@@ -862,17 +1191,20 @@ impl AppModel {
         )
         .on_press(Message::Noop);
 
-        widget::container(
-            widget::Row::new()
-                .push(widget::space::horizontal().width(Length::Fill))
-                .push(pane)
-                .padding([
-                    TOP_BAR_HEIGHT as u16,
-                    CONTEXT_DRAWER_INSET,
-                    CONTEXT_DRAWER_INSET,
-                    0,
-                ]),
-        )
+        let spring = widget::space::horizontal().width(Length::Fill);
+        let layout = self.controls_bar_layout();
+        let row = if self.context_drawer_aligns_right(layout) {
+            widget::Row::new().push(spring).push(pane)
+        } else {
+            widget::Row::new().push(pane).push(spring)
+        };
+
+        widget::container(row.padding([
+            Self::context_drawer_top_inset(layout) as u16,
+            CONTEXT_DRAWER_INSET,
+            CONTEXT_DRAWER_INSET,
+            0,
+        ]))
         .width(Length::Fill)
         .height(Length::Fill)
         .into()
@@ -886,16 +1218,16 @@ impl AppModel {
         // hidden-chrome window would be unmovable on compositors that have no
         // titlebar of their own.
         if self.mode.is_view_only() || self.ui_hidden {
-            let empty = widget::container(
-                widget::Space::new()
-                    .width(Length::Fill)
-                    .height(Length::Fixed(TOP_BAR_HEIGHT)),
-            )
-            .width(Length::Fill)
-            .style(|_theme| widget::container::Style {
+            let sideways = self.controls_are_sideways();
+            let space = widget::Space::new()
+                .width(Length::Fill)
+                .height(Length::Fill);
+            let mut empty = widget::container(space).style(|_theme| widget::container::Style {
                 background: Some(Background::Color(Color::TRANSPARENT)),
                 ..Default::default()
             });
+            let (width, height) = bar_cross_lengths(sideways, TOP_BAR_HEIGHT);
+            empty = empty.width(width).height(height);
             return widget::mouse_area(empty)
                 .on_drag(Message::WindowDrag)
                 .on_double_press(Message::WindowToggleMaximize)
@@ -904,28 +1236,52 @@ impl AppModel {
 
         let spacing = cosmic::theme::spacing();
         let is_disabled = self.transition_state.ui_disabled;
+        let sideways = self.controls_are_sideways();
 
-        // Match the native COSMIC header bar padding: [7, 7, 8, 7] (not maximized)
-        let mut row = widget::Row::new()
-            .padding([7, 7, 8, 7])
-            .align_y(Alignment::Center);
+        // Axis-aware spacers. Portrait lays the bar out as a `Row`, so gaps run
+        // horizontally; sideways it becomes a `Column`, so the same gaps run
+        // vertically. In the portrait branch these produce `Space` widgets
+        // byte-identical to the old inline constructions.
+        let axis_gap = move |px: f32| -> Element<'static, Message> {
+            let s = widget::Space::new();
+            if sideways {
+                s.height(Length::Fixed(px)).into()
+            } else {
+                s.width(Length::Fixed(px)).into()
+            }
+        };
+        let fill_gap = move || -> Element<'static, Message> {
+            let s = widget::Space::new();
+            if sideways {
+                s.height(Length::Fill).into()
+            } else {
+                s.width(Length::Fill).into()
+            }
+        };
+
+        // Children in portrait order (leading -> trailing). Sideways, this same
+        // sequence is folded into a `Column`; a rotate-left (270deg / Ccw90)
+        // turn reverses it so the trailing window controls land at the strip's
+        // TOP, and rotate-right (90deg) mirrors that - see
+        // `bar_layout::sideways_column_reverses`.
+        let mut cells: Vec<Element<'_, Message>> = Vec::new();
 
         // Show recording indicator when recording (from controls module)
         if let Some(indicator) = self.build_recording_indicator() {
-            row = row.push(indicator);
-            row = row.push(widget::space::horizontal().width(spacing.space_s));
+            cells.push(indicator);
+            cells.push(axis_gap(f32::from(spacing.space_s)));
         }
 
         // Show streaming indicator when streaming virtual camera
         if let Some(indicator) = self.build_streaming_indicator() {
-            row = row.push(indicator);
-            row = row.push(widget::space::horizontal().width(spacing.space_s));
+            cells.push(indicator);
+            cells.push(axis_gap(f32::from(spacing.space_s)));
         }
 
         // Show timelapse indicator when timelapse is running
         if let Some(indicator) = self.build_timelapse_indicator() {
-            row = row.push(indicator);
-            row = row.push(widget::space::horizontal().width(spacing.space_s));
+            cells.push(indicator);
+            cells.push(axis_gap(f32::from(spacing.space_s)));
         }
 
         // Show format/resolution button in both photo and video modes
@@ -945,18 +1301,14 @@ impl AppModel {
             && !self.is_format_picker_hidden();
 
         if show_format_button {
-            row = row.push(self.build_format_button());
+            cells.push(self.build_format_button());
         } else if has_file_source {
             // Show file source resolution (non-clickable)
-            row = row.push(self.build_file_source_resolution_label());
+            cells.push(self.build_file_source_resolution_label());
         }
 
         // Right side buttons
-        row = row.push(
-            widget::Space::new()
-                .width(Length::Fill)
-                .height(Length::Shrink),
-        );
+        cells.push(fill_gap());
 
         // Top-bar toggle buttons (flash, HDR, file, tools) are always
         // shown. Picker overlays appear on top of them but never replace them.
@@ -973,13 +1325,14 @@ impl AppModel {
             let flash_icon = widget::icon::from_svg_bytes(flash_icon_bytes).symbolic(true);
 
             if is_disabled {
-                row = row.push(
+                cells.push(
                     widget::container(widget::icon(flash_icon).size(20))
                         .style(disabled_top_bar_icon_style)
-                        .padding([4, 8]),
+                        .padding([4, 8])
+                        .into(),
                 );
             } else {
-                row = row.push(overlay_icon_button(
+                cells.push(overlay_icon_button(
                     flash_icon,
                     Some(Message::ToggleFlash),
                     self.flash.enabled,
@@ -987,11 +1340,7 @@ impl AppModel {
             }
 
             // 5px spacing
-            row = row.push(
-                widget::Space::new()
-                    .width(Length::Fixed(5.0))
-                    .height(Length::Shrink),
-            );
+            cells.push(axis_gap(5.0));
 
             if self.should_show_burst_button() {
                 // Show moon-off icon when HDR+ is disabled (by override or setting)
@@ -1004,13 +1353,14 @@ impl AppModel {
                 let moon_icon = widget::icon::from_svg_bytes(moon_icon_bytes).symbolic(true);
 
                 if is_disabled {
-                    row = row.push(
+                    cells.push(
                         widget::container(widget::icon(moon_icon).size(20))
                             .style(disabled_top_bar_icon_style)
-                            .padding([4, 8]),
+                            .padding([4, 8])
+                            .into(),
                     );
                 } else {
-                    row = row.push(overlay_icon_button(
+                    cells.push(overlay_icon_button(
                         moon_icon,
                         Some(Message::ToggleBurstMode),
                         is_hdr_active,
@@ -1018,11 +1368,7 @@ impl AppModel {
                 }
 
                 // 5px spacing
-                row = row.push(
-                    widget::Space::new()
-                        .width(Length::Fixed(5.0))
-                        .height(Length::Shrink),
-                );
+                cells.push(axis_gap(5.0));
             }
         }
 
@@ -1032,14 +1378,18 @@ impl AppModel {
             if is_disabled {
                 let file_button =
                     widget::button::icon(icon::from_name("document-open-symbolic").symbolic(true));
-                row = row.push(widget::container(file_button).style(disabled_top_bar_icon_style));
+                cells.push(
+                    widget::container(file_button)
+                        .style(disabled_top_bar_icon_style)
+                        .into(),
+                );
             } else {
                 let message = if has_file {
                     Message::ClearVirtualCameraFile
                 } else {
                     Message::OpenVirtualCameraFile
                 };
-                row = row.push(overlay_icon_button(
+                cells.push(overlay_icon_button(
                     icon::from_name("document-open-symbolic").symbolic(true),
                     Some(message),
                     has_file,
@@ -1047,11 +1397,7 @@ impl AppModel {
             }
 
             // 5px spacing
-            row = row.push(
-                widget::Space::new()
-                    .width(Length::Fixed(5.0))
-                    .height(Length::Shrink),
-            );
+            cells.push(axis_gap(5.0));
         }
 
         // Tools menu button (opens overlay with timer, aspect ratio, exposure, filter, motor)
@@ -1060,13 +1406,14 @@ impl AppModel {
         let tools_icon = widget::icon::from_svg_bytes(TOOLS_GRID_ICON).symbolic(true);
 
         if is_disabled {
-            row = row.push(
+            cells.push(
                 widget::container(widget::icon(tools_icon).size(20))
                     .style(disabled_top_bar_icon_style)
-                    .padding([4, 8]),
+                    .padding([4, 8])
+                    .into(),
             );
         } else {
-            row = row.push(overlay_icon_button(
+            cells.push(overlay_icon_button(
                 tools_icon,
                 Some(Message::ToggleToolsMenu),
                 tools_active,
@@ -1075,52 +1422,78 @@ impl AppModel {
 
         // Settings button (normally in header_end)
         if !is_disabled {
-            row = row.push(
+            cells.push(
                 widget::button::icon(icon::from_name("preferences-system-symbolic").symbolic(true))
                     .extra_small()
                     .on_press(Message::ToggleContextPage(
                         crate::app::state::ContextPage::Settings,
-                    )),
+                    ))
+                    .into(),
             );
         }
 
         // Window control buttons
-        row = row.push(
-            widget::Space::new()
-                .width(Length::Fixed(5.0))
-                .height(Length::Shrink),
+        cells.push(axis_gap(5.0));
+        cells.push(
+            widget::button::icon(icon::from_name("window-minimize-symbolic").symbolic(true))
+                .extra_small()
+                .on_press(Message::WindowMinimize)
+                .into(),
         );
-        row = row
-            .push(
-                widget::button::icon(icon::from_name("window-minimize-symbolic").symbolic(true))
-                    .extra_small()
-                    .on_press(Message::WindowMinimize),
-            )
-            .push(
-                widget::button::icon(icon::from_name("window-maximize-symbolic").symbolic(true))
-                    .extra_small()
-                    .on_press(Message::WindowToggleMaximize),
-            )
-            .push(
-                widget::button::icon(icon::from_name("window-close-symbolic").symbolic(true))
-                    .extra_small()
-                    .on_press(Message::WindowClose),
-            );
+        cells.push(
+            widget::button::icon(icon::from_name("window-maximize-symbolic").symbolic(true))
+                .extra_small()
+                .on_press(Message::WindowToggleMaximize)
+                .into(),
+        );
+        cells.push(
+            widget::button::icon(icon::from_name("window-close-symbolic").symbolic(true))
+                .extra_small()
+                .on_press(Message::WindowClose)
+                .into(),
+        );
 
-        // This row *is* the window's title bar, so it adopts the native COSMIC
+        // Portrait keeps the historical `Row`; sideways folds the same cells
+        // into a `Column`. The top bar's window controls belong at the strip's
+        // TOP in BOTH rotations - a horizontal mirror preserves vertical order,
+        // so unlike the bottom bar (which mirrors via `sideways_column_reverses`)
+        // the portrait cells, whose window controls are trailing, are reversed
+        // whenever sideways. Not doing this at 90° left them at the bottom and
+        // pushed the cluster partly off-screen.
+        let content: Element<'_, Message> = if sideways {
+            cells.reverse();
+            widget::Column::with_children(cells)
+                .padding([7, 7, 8, 7])
+                .align_x(Alignment::Center)
+                .into()
+        } else {
+            widget::Row::with_children(cells)
+                .padding([7, 7, 8, 7])
+                .align_y(Alignment::Center)
+                .into()
+        };
+
+        // This bar *is* the window's title bar, so it adopts the native COSMIC
         // header bar's colours: accent icons while the window holds focus,
         // dimmed while it doesn't, which is how a COSMIC window signals that
         // it's the active one. `transparent: true` keeps the header bar's
         // background off so the live preview still shows through (issue #565).
         let focused = self.window_is_focused();
-        let top_bar_widget =
-            widget::container(row)
-                .width(Length::Fill)
-                .class(cosmic::theme::Container::HeaderBar {
-                    focused,
-                    sharp_corners: true,
-                    transparent: true,
-                });
+        let mut top_bar_widget =
+            widget::container(content).class(cosmic::theme::Container::HeaderBar {
+                focused,
+                sharp_corners: true,
+                transparent: true,
+            });
+        // Width always follows the sideways/portrait swap. Height is only
+        // pinned in the sideways case - portrait leaves it at the
+        // container's default (sized from the row's own content/padding), same
+        // as before this was factored through the shared helper.
+        let (width, height) = bar_cross_lengths(sideways, TOP_BAR_HEIGHT);
+        top_bar_widget = top_bar_widget.width(width);
+        if sideways {
+            top_bar_widget = top_bar_widget.height(height);
+        }
 
         // Make the top bar draggable for window movement
         widget::mouse_area(top_bar_widget)
@@ -1229,16 +1602,27 @@ impl AppModel {
     ///
     /// Shows current zoom level (1x, 1.3x, 2x, etc.) in Photo mode.
     /// Click to reset zoom to 1.0.
-    fn build_zoom_label(&self) -> Element<'_, Message> {
-        let zoom_text = if self.zoom_level >= 10.0 {
+    /// Rendered zoom level, e.g. "1x", "1.3x", "10x". Shared by the portrait
+    /// zoom-label button and the sideways rotated chip widget.
+    fn zoom_label_text(&self) -> String {
+        if self.zoom_level >= 10.0 {
             "10x".to_string()
         } else if (self.zoom_level - self.zoom_level.round()).abs() < 0.05 {
             format!("{}x", self.zoom_level.round() as u32)
         } else {
             format!("{:.1}x", self.zoom_level)
-        };
+        }
+    }
 
-        let is_zoomed = (self.zoom_level - 1.0).abs() > 0.01;
+    /// Whether the preview is zoomed past 1x (drives the zoom chip's accent
+    /// fill).
+    fn is_zoomed(&self) -> bool {
+        (self.zoom_level - 1.0).abs() > 0.01
+    }
+
+    fn build_zoom_label(&self) -> Element<'_, Message> {
+        let zoom_text = self.zoom_label_text();
+        let is_zoomed = self.is_zoomed();
 
         // Suggested (accent fill) when zoomed; otherwise a frosted Text button
         // so the resting background matches the top/bottom bars.
@@ -1254,6 +1638,117 @@ impl AppModel {
         } else {
             self.frosted_panel(button.into(), OVERLAY_CONTAINER)
         }
+    }
+
+    /// Build the fit/zoom controls with their normal button styling. Portrait
+    /// places them side by side; side layouts stack the same upright buttons.
+    fn build_fit_zoom_group(&self, axis: FitZoomAxis) -> Element<'_, Message> {
+        let spacing = cosmic::theme::spacing();
+        let fit_icon_name = if self.preview_fit_to_view {
+            "view-fullscreen-symbolic"
+        } else {
+            "view-restore-symbolic"
+        };
+        let fit_button_inner = widget::button::custom(
+            widget::Row::new()
+                .push(
+                    widget::icon::from_name(fit_icon_name)
+                        .symbolic(true)
+                        .size(16),
+                )
+                .padding([0, spacing.space_s])
+                .height(Length::Fixed(spacing.space_l.into()))
+                .align_y(Alignment::Center),
+        )
+        .padding(0)
+        .on_press(Message::TogglePreviewFit)
+        .class(if self.preview_fit_to_view {
+            cosmic::theme::Button::Suggested
+        } else {
+            overlay_chip_button_class()
+        });
+        // Inactive: frosted like the top/bottom bars so the button sits on a
+        // matching surface. Active: keep the Suggested (accent) fill so toggle
+        // state stays visible.
+        let fit_button: Element<'_, Message> = if self.preview_fit_to_view {
+            fit_button_inner.into()
+        } else {
+            self.frosted_panel(fit_button_inner.into(), OVERLAY_CONTAINER)
+        };
+
+        match axis {
+            FitZoomAxis::Horizontal => widget::Row::new()
+                .push(fit_button)
+                .push(widget::space::horizontal().width(Length::Fixed(8.0)))
+                .push(self.build_zoom_label())
+                .align_y(Alignment::Center)
+                .into(),
+            FitZoomAxis::Vertical => widget::Column::new()
+                .push(fit_button)
+                .push(widget::space::vertical().height(Length::Fixed(8.0)))
+                .push(self.build_zoom_label())
+                .align_x(cosmic::iced::alignment::Horizontal::Center)
+                .into(),
+        }
+    }
+
+    /// Distance from the window edge to the fit/zoom chips in a side strip.
+    /// View mode has no capture lane, so its visible strip is only the bottom
+    /// bar rather than the full portrait-band-derived strip width.
+    fn sideways_chip_inset(&self, gap: f32) -> f32 {
+        let strip_width = if self.mode.is_view_only() {
+            crate::app::bottom_bar::BOTTOM_BAR_HEIGHT
+        } else {
+            crate::app::bar_layout::SIDEWAYS_STRIP_WIDTH
+        };
+        strip_width + gap
+    }
+
+    /// Float the fit/zoom chip row over the preview against the sideways
+    /// strip's INNER edge (the side nearest the preview), vertically centred
+    /// and mirrored per rotation.
+    ///
+    /// The strip sits on `bottom_edge` - `Edge::Right` at 270°, `Edge::Left` at
+    /// 90° - so the chips hug that edge from the preview side, offset inward by
+    /// the strip's width so the gap to the strip is real. Portrait never calls
+    /// this: there the row is stacked inside the strip instead.
+    fn float_chips_over_preview<'a>(
+        &self,
+        chips: Element<'a, Message>,
+        bottom_edge: crate::app::bar_layout::Edge,
+    ) -> Element<'a, Message> {
+        use crate::app::bar_layout::Edge;
+        use cosmic::iced::Padding;
+        use cosmic::iced::alignment::{Horizontal, Vertical};
+
+        // Offset inward by the strip width PLUS a gap, so the chips sit a real
+        // gap clear of the strip's inner edge (matching the portrait spacing
+        // between the chips and the bottom bar) instead of touching it.
+        let gap = f32::from(cosmic::theme::spacing().space_xs);
+        let inset = self.sideways_chip_inset(gap);
+        let c = widget::container(chips)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_y(Vertical::Center);
+        match bottom_edge {
+            // Strip on the right (270°): chips hug its left (inner) edge.
+            Edge::Right => c.align_x(Horizontal::Right).padding(Padding {
+                top: 0.0,
+                right: inset,
+                bottom: 0.0,
+                left: 0.0,
+            }),
+            // Strip on the left (90°): mirror - chips hug its right (inner) edge.
+            Edge::Left => c.align_x(Horizontal::Left).padding(Padding {
+                top: 0.0,
+                right: 0.0,
+                bottom: 0.0,
+                left: inset,
+            }),
+            // Sideways is only ever Left/Right; centre as a safe fallback.
+            _ => c.align_x(Horizontal::Center),
+        }
+        .into()
     }
 
     /// Build the QR code overlay layer
@@ -1280,17 +1775,15 @@ impl AppModel {
 
         let should_mirror = self.should_mirror_preview();
 
-        // Pass the animated `cover_blend` and UI bar heights so the QR
-        // overlay tracks the live preview through a Photo↔fit-to-view
-        // transition — without this the boxes are placed against the full
-        // window in Contain mode where the video is actually letterboxed.
+        // Reuse the preview's transform and four-sided content insets so the
+        // boxes stay registered through rotation and fit/fill animation.
         build_qr_overlay(
             &self.qr_detections,
             frame.width,
             frame.height,
             self.cover_blend(),
-            self.top_ui_height(),
-            self.bottom_ui_height(),
+            self.bar_insets(),
+            self.preview_adjusted_rotation(self.current_frame_rotation, should_mirror),
             should_mirror,
         )
     }
@@ -1426,28 +1919,75 @@ impl AppModel {
         // Build panel with semi-transparent themed background
         let panel = self.frosted_panel(column.into(), PICKER_PANEL);
 
-        // Position in top-right corner, below the custom title bar so the menu
-        // doesn't overlap the window controls.
-        let positioned = widget::Row::new()
-            .push(
-                widget::Space::new()
-                    .width(Length::Fill)
-                    .height(Length::Shrink),
-            )
-            .push(panel)
-            .padding([
-                TOP_BAR_HEIGHT as u16 + spacing.space_xs,
-                spacing.space_xs,
-                0,
-                spacing.space_xs,
-            ]);
+        // Anchor to the top bar's inner edge (below it in portrait, off the side
+        // bar in landscape), tapping outside to close.
+        self.anchor_bar_popup(panel, Message::CloseToolsMenu)
+    }
+
+    /// Anchor a top popup (tools menu, exposure/color pickers) `space_xs` off the
+    /// top bar's inner edge at the bar's trailing (top) end, in every
+    /// orientation, and close it when the surrounding area is tapped.
+    ///
+    /// Portrait hangs the panel below the full-width top bar, top-right (unchanged
+    /// from when this was a hardcoded `Row` + spring). Held sideways, the top bar
+    /// is a vertical strip on one edge, so the panel hangs `TOP_BAR_HEIGHT +
+    /// space_xs` in from that strip near the top, clear of the control strip /
+    /// capture button on the opposite edge. The exact insets and which side the
+    /// panel hugs come from [`bar_anchored_popup_padding`].
+    pub(crate) fn anchor_bar_popup<'a>(
+        &self,
+        panel: Element<'a, Message>,
+        close_msg: Message,
+    ) -> Element<'a, Message> {
+        // Trailing (right-end) popups: tools menu, exposure/color/motor pickers.
+        self.anchor_bar_popup_at(panel, close_msg, false)
+    }
+
+    /// Like [`anchor_bar_popup`], but for a popup whose button sits at the top
+    /// bar's *leading* (left) end - currently just the format picker. Portrait
+    /// hangs the panel below the bar's left end; the sideways side-strip anchor
+    /// is identical to the trailing case (both hang off the same strip edge).
+    pub(crate) fn anchor_bar_popup_leading<'a>(
+        &self,
+        panel: Element<'a, Message>,
+        close_msg: Message,
+    ) -> Element<'a, Message> {
+        self.anchor_bar_popup_at(panel, close_msg, true)
+    }
+
+    fn anchor_bar_popup_at<'a>(
+        &self,
+        panel: Element<'a, Message>,
+        close_msg: Message,
+        leading: bool,
+    ) -> Element<'a, Message> {
+        let spacing = cosmic::theme::spacing();
+        let top_bar = self.controls_bar_layout().top_bar;
+        let (padding, align_right) = crate::app::bar_layout::bar_anchored_popup_padding(
+            top_bar,
+            TOP_BAR_HEIGHT as u16,
+            spacing.space_xs,
+            leading,
+        );
+
+        let spring = widget::Space::new()
+            .width(Length::Fill)
+            .height(Length::Shrink);
+        // `align_right` picks the leading vs trailing spring: a leading Fill
+        // pushes the panel to the right edge, a trailing Fill to the left.
+        let positioned = if align_right {
+            widget::Row::new().push(spring).push(panel)
+        } else {
+            widget::Row::new().push(panel).push(spring)
+        }
+        .padding(padding);
 
         widget::mouse_area(
             widget::container(positioned)
                 .width(Length::Fill)
                 .height(Length::Fill),
         )
-        .on_press(Message::CloseToolsMenu)
+        .on_press(close_msg)
         .into()
     }
 
@@ -1751,5 +2291,225 @@ impl AppModel {
             .align_x(cosmic::iced::alignment::Horizontal::Center)
             .align_y(cosmic::iced::alignment::Vertical::Center)
             .into()
+    }
+}
+
+#[cfg(test)]
+mod bar_insets_tests {
+    use super::*;
+
+    #[test]
+    fn compact_side_picker_height_stays_inside_the_window() {
+        let spacing = cosmic::theme::spacing();
+        assert_eq!(
+            picker_panel_height(true, 360.0),
+            Length::Fixed(360.0 - f32::from(spacing.space_xs) * 2.0)
+        );
+        assert_eq!(picker_panel_height(false, 360.0), Length::Shrink);
+    }
+
+    #[test]
+    fn sideways_video_progress_is_kept_with_the_side_controls() {
+        assert_eq!(
+            video_progress_placement(true),
+            VideoProgressPlacement::AboveSideLanes
+        );
+        assert_eq!(
+            video_progress_placement(false),
+            VideoProgressPlacement::AboveCapture
+        );
+    }
+
+    #[test]
+    fn sideways_modal_padding_reserves_side_bars_not_portrait_bars() {
+        let left = AppModel {
+            config: crate::config::Config {
+                controls_position: crate::config::ControlsPosition::Left,
+                ..Default::default()
+            },
+            screen_width: 733.0,
+            screen_height: 360.0,
+            ..Default::default()
+        };
+        let padding = overlay_popup_padding(&left);
+
+        assert_eq!(padding[0], 0.0);
+        assert_eq!(padding[2], 0.0);
+        assert!(padding[1] > 0.0 || padding[3] > 0.0);
+    }
+
+    #[test]
+    fn sideways_fit_zoom_uses_the_standard_upright_row() {
+        assert_eq!(fit_zoom_layout(true), FitZoomLayout::FloatUpright);
+        assert_eq!(fit_zoom_layout(false), FitZoomLayout::Inline);
+    }
+
+    #[test]
+    fn sideways_fit_zoom_stacks_buttons_vertically() {
+        assert_eq!(fit_zoom_axis(true), FitZoomAxis::Vertical);
+        assert_eq!(fit_zoom_axis(false), FitZoomAxis::Horizontal);
+    }
+    use crate::app::bar_layout::bar_layout;
+    use crate::backends::display_orientation::DisplayOrientation;
+
+    #[test]
+    fn context_drawer_only_reserves_the_horizontal_title_bar() {
+        assert_eq!(
+            AppModel::context_drawer_top_inset(bar_layout(DisplayOrientation::Rotate0)),
+            TOP_BAR_HEIGHT
+        );
+        assert_eq!(
+            AppModel::context_drawer_top_inset(bar_layout(DisplayOrientation::Rotate180)),
+            TOP_BAR_HEIGHT
+        );
+        assert_eq!(
+            AppModel::context_drawer_top_inset(bar_layout(DisplayOrientation::Rotate90)),
+            0.0
+        );
+        assert_eq!(
+            AppModel::context_drawer_top_inset(bar_layout(DisplayOrientation::Rotate270)),
+            0.0
+        );
+    }
+
+    #[test]
+    fn context_drawer_stays_opposite_a_side_title_bar() {
+        let m = AppModel::default();
+        assert!(m.context_drawer_aligns_right(bar_layout(DisplayOrientation::Rotate270)));
+        assert!(!m.context_drawer_aligns_right(bar_layout(DisplayOrientation::Rotate90)));
+    }
+
+    #[test]
+    fn manual_left_controls_keep_context_drawers_on_the_right() {
+        let m = AppModel {
+            config: crate::config::Config {
+                controls_position: crate::config::ControlsPosition::Left,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        assert!(m.context_drawer_aligns_right(m.controls_bar_layout()));
+    }
+
+    #[test]
+    fn view_mode_chips_collapse_the_missing_capture_lane() {
+        let gap = 12.0;
+        let photo = AppModel {
+            mode: CameraMode::Photo,
+            ..Default::default()
+        };
+        let view = AppModel {
+            mode: CameraMode::View,
+            ..Default::default()
+        };
+
+        assert_eq!(
+            photo.sideways_chip_inset(gap),
+            crate::app::bar_layout::SIDEWAYS_STRIP_WIDTH + gap
+        );
+        assert_eq!(
+            view.sideways_chip_inset(gap),
+            crate::app::bottom_bar::BOTTOM_BAR_HEIGHT + gap
+        );
+    }
+
+    /// Deliberately different top/bottom values so a swapped mapping fails
+    /// loudly instead of passing by coincidence (e.g. if both were 100.0).
+    const TOP: f32 = 47.0;
+    const BOTTOM: f32 = 174.0;
+
+    #[test]
+    fn rotate0_keeps_bars_on_top_and_bottom() {
+        let layout = bar_layout(DisplayOrientation::Rotate0);
+        let insets = AppModel::map_bar_insets(layout, TOP, BOTTOM);
+
+        assert_eq!(insets.top, TOP);
+        assert_eq!(insets.bottom, BOTTOM);
+        assert_eq!(insets.left, 0.0);
+        assert_eq!(insets.right, 0.0);
+    }
+
+    #[test]
+    fn rotate180_is_treated_as_portrait() {
+        let layout = bar_layout(DisplayOrientation::Rotate180);
+        let insets = AppModel::map_bar_insets(layout, TOP, BOTTOM);
+
+        assert_eq!(insets.top, TOP);
+        assert_eq!(insets.bottom, BOTTOM);
+        assert_eq!(insets.left, 0.0);
+        assert_eq!(insets.right, 0.0);
+    }
+
+    /// `Rotate270` keeps the top bar on the LEFT edge, bottom bar on the RIGHT.
+    #[test]
+    fn rotate270_puts_the_top_bar_on_the_left() {
+        let layout = bar_layout(DisplayOrientation::Rotate270);
+        let insets = AppModel::map_bar_insets(layout, TOP, BOTTOM);
+
+        assert_eq!(insets.left, TOP);
+        assert_eq!(insets.right, BOTTOM);
+        assert_eq!(insets.top, 0.0);
+        assert_eq!(insets.bottom, 0.0);
+    }
+
+    /// `Rotate90` is a mirror of `Rotate270`, not identical to it: the top bar
+    /// lands on the RIGHT edge instead of the left. This is a deliberate
+    /// ergonomic override (see `bar_layout`'s doc) - the compositor renders 90
+    /// and 270 byte-identically, but the bars mirror anyway so controls track
+    /// which physical edge is now the device's "bottom".
+    #[test]
+    fn rotate90_mirrors_rotate270_top_bar_on_the_right() {
+        let insets =
+            AppModel::map_bar_insets(bar_layout(DisplayOrientation::Rotate90), TOP, BOTTOM);
+
+        assert_eq!(insets.left, BOTTOM);
+        assert_eq!(insets.right, TOP);
+        assert_eq!(insets.top, 0.0);
+        assert_eq!(insets.bottom, 0.0);
+
+        assert_ne!(
+            insets,
+            AppModel::map_bar_insets(bar_layout(DisplayOrientation::Rotate270), TOP, BOTTOM)
+        );
+    }
+
+    /// End-to-end through `AppModel::bar_insets`, not just the pure helper -
+    /// pins that the display-orientation field actually reaches the mapping.
+    #[test]
+    fn bar_insets_reads_the_models_display_orientation() {
+        let m = AppModel {
+            display_orientation: DisplayOrientation::Rotate90,
+            ..AppModel::default()
+        };
+
+        let insets = m.bar_insets();
+
+        // Rotate90's top bar is on the RIGHT edge, so the top bar's extent
+        // (top_ui_height) lands in insets.right, not insets.left.
+        assert_eq!(insets.left, m.bottom_ui_height());
+        assert_eq!(insets.right, m.top_ui_height());
+        assert_eq!(insets.top, 0.0);
+        assert_eq!(insets.bottom, 0.0);
+    }
+
+    #[test]
+    fn manual_controls_position_overrides_bar_edges() {
+        let m = AppModel {
+            display_orientation: DisplayOrientation::Rotate0,
+            config: crate::config::Config {
+                controls_position: crate::config::ControlsPosition::Left,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let layout = m.controls_bar_layout();
+        let insets = m.bar_insets();
+
+        assert_eq!(layout.bottom_bar, crate::app::bar_layout::Edge::Left);
+        assert_eq!(layout.top_bar, crate::app::bar_layout::Edge::Right);
+        assert_eq!(insets.left, m.bottom_ui_height());
+        assert_eq!(insets.right, m.top_ui_height());
     }
 }
