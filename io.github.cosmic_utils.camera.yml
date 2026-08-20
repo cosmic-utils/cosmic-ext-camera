@@ -108,6 +108,9 @@ modules:
   - name: libcamera
     buildsystem: meson
     config-opts:
+      # Strip the installed IPA modules before libcamera's install-time signing
+      # step, so flatpak-builder has no debug sections to rewrite afterwards.
+      - -Dstrip=true
       - -Dcam=disabled
       - -Dqcam=disabled
       - -Dgstreamer=disabled
@@ -118,9 +121,9 @@ modules:
       - -Dtest=false
     sources:
       - type: git
-        url: https://github.com/FreddyFunk/libcamera.git
-        branch: sandbox-ipa-fallback
-        commit: 68f8bd1c8cbfe7416fb3fa09f45e18d159d92723
+        url: https://git.libcamera.org/libcamera/libcamera.git
+        tag: v0.7.2
+        commit: 191e202178f02430b5942397c70d215cdd2056fa
       # Since v0.7.2 the virtual pipeline handler is built on every arch, and it
       # pulls in libyuv as a cmake subproject. Meson would clone libyuv from its
       # wrap, but the build sandbox has no network. Provide the sources up front
