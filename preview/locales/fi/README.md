@@ -2,17 +2,13 @@
 
 # Kamera (fi)
 
-*Camera for photos, videos and QR codes.*
+*Kamera kuville, videoille sekä QR-koodeille.*
 
 |  |  |
 | :---: | :---: |
-| ![Photo mode with tools menu](preview-001.png)<br>**Photo mode with tools menu** | ![Photo mode on a Linux phone](preview-002.png)<br>**Photo mode on a Linux phone** |
-| ![Filter picker](preview-003.png)<br>**Filter picker** | ![Video recording in progress](preview-004.png)<br>**Video recording in progress** |
-| ![QR code detection](preview-005.png)<br>**QR code detection** | ![Advanced settings](preview-006.png)<br>**Advanced settings** |
-
-> 6 of 6 captions are not translated into `fi` yet
-> and are shown in English. Translations are welcome in
-> [`i18n/fi/camera.ftl`](../../../i18n/fi/camera.ftl).
+| ![Kuvatila työkaluvalikolla](preview-001.png)<br>**Kuvatila työkaluvalikolla** | ![Kuvatila Linux puhelimessa](preview-002.png)<br>**Kuvatila Linux puhelimessa** |
+| ![Suodatinvalitsin](preview-003.png)<br>**Suodatinvalitsin** | ![Videotallennus käynnissä](preview-004.png)<br>**Videotallennus käynnissä** |
+| ![QR-koodin tunnistaminen](preview-005.png)<br>**QR-koodin tunnistaminen** | ![Edistyneet asetukset](preview-006.png)<br>**Edistyneet asetukset** |
 
 ---
 
