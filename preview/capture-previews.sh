@@ -131,7 +131,7 @@ chmod 700 "$XDG_RUNTIME_DIR"
 # cosmic-config stores one file per field, named after the field, under
 # v<CONFIG_VERSION>. Keep both in sync with src/config.rs.
 APP_ID="io.github.cosmic_utils.camera"
-CONFIG_VERSION=20
+CONFIG_VERSION=21
 CONFIG_DIR="$XDG_CONFIG_HOME/cosmic/$APP_ID/v$CONFIG_VERSION"
 mkdir -p "$CONFIG_DIR"
 
