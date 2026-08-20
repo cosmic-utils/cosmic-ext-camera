@@ -379,6 +379,25 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.3.0" date="2026-08-20">
+      <description>
+        <p>Release 1.3.0 includes the following changes:</p>
+        <ul>
+          <li>deps(cargo): bump zbus from 5.18.0 to 5.19.0 in the rust-dependencies group</li>
+          <li>chore: regenerate preview screenshots</li>
+          <li>deps(cargo): bump futures from 0.3.33 to 0.3.34 in the rust-dependencies group</li>
+          <li>deps(cargo): bump uuid from 1.24.0 to 1.24.1 in the rust-dependencies group</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>feat(orientation): add landscape display support</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>fix: respect preview generation settings</li>
+          <li>fix: clean up stale preview pull requests</li>
+          <li>chore(l10n): update translations</li>
+          <li>fix: preserve libcamera IPA signatures in Flatpak</li>
+          <li>chore: regenerate preview screenshots</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.2.2" date="2026-08-11">
       <description>
         <p>Release 1.2.2 includes the following changes:</p>
