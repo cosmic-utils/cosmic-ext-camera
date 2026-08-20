@@ -6,7 +6,6 @@
 
 use super::ControlRange;
 use crate::app::overlay_style::PICKER_PANEL;
-use crate::app::preview_geometry::TOP_BAR_HEIGHT;
 use crate::app::state::{AppModel, Message};
 use crate::fl;
 use cosmic::Element;
@@ -47,34 +46,18 @@ impl AppModel {
         }
 
         // Build picker panel with semi-transparent themed background
+        let picker_content = widget::scrollable(column).height(
+            crate::app::view::picker_panel_height(self.controls_are_sideways(), self.screen_height),
+        );
         let picker_panel = widget::mouse_area(
-            widget::container(self.frosted_panel(column.into(), PICKER_PANEL))
+            widget::container(self.frosted_panel(picker_content.into(), PICKER_PANEL))
                 .width(Length::Fixed(PICKER_PANEL_WIDTH)),
         )
         .on_press(Message::Noop);
 
-        // Position picker in top-right corner
-        let picker_positioned = widget::Row::new()
-            .push(
-                widget::Space::new()
-                    .width(Length::Fill)
-                    .height(Length::Shrink),
-            )
-            .push(picker_panel)
-            .padding([
-                TOP_BAR_HEIGHT as u16 + spacing.space_xs,
-                spacing.space_xs,
-                0,
-                spacing.space_xs,
-            ]);
-
-        widget::mouse_area(
-            widget::container(picker_positioned)
-                .width(Length::Fill)
-                .height(Length::Fill),
-        )
-        .on_press(Message::CloseExposurePicker)
-        .into()
+        // Anchor to the top bar's inner edge (below it in portrait, off the side
+        // bar in landscape), shared with the tools menu and the color picker.
+        self.anchor_bar_popup(picker_panel.into(), Message::CloseExposurePicker)
     }
 
     /// Build mode toggle row (Auto/Manual)
@@ -500,33 +483,18 @@ impl AppModel {
         column = self.add_image_controls(column, color_data);
         column = self.add_white_balance_controls(column, color_data);
 
+        let picker_content = widget::scrollable(column).height(
+            crate::app::view::picker_panel_height(self.controls_are_sideways(), self.screen_height),
+        );
         let picker_panel = widget::mouse_area(
-            widget::container(self.frosted_panel(column.into(), PICKER_PANEL))
+            widget::container(self.frosted_panel(picker_content.into(), PICKER_PANEL))
                 .width(Length::Fixed(COLOR_PICKER_WIDTH)),
         )
         .on_press(Message::Noop);
 
-        let picker_positioned = widget::Row::new()
-            .push(
-                widget::Space::new()
-                    .width(Length::Fill)
-                    .height(Length::Shrink),
-            )
-            .push(picker_panel)
-            .padding([
-                TOP_BAR_HEIGHT as u16 + spacing.space_xs,
-                spacing.space_xs,
-                0,
-                spacing.space_xs,
-            ]);
-
-        widget::mouse_area(
-            widget::container(picker_positioned)
-                .width(Length::Fill)
-                .height(Length::Fill),
-        )
-        .on_press(Message::CloseColorPicker)
-        .into()
+        // Anchor to the top bar's inner edge (below it in portrait, off the side
+        // bar in landscape), shared with the tools menu and the exposure picker.
+        self.anchor_bar_popup(picker_panel.into(), Message::CloseColorPicker)
     }
 
     /// Build color picker header with title and reset button

@@ -21,6 +21,21 @@ fn empty_overlay<'a>() -> Element<'a, Message> {
 }
 
 impl AppModel {
+    fn composition_preview_geometry(
+        &self,
+        frame_width: u32,
+        frame_height: u32,
+    ) -> (f32, f32, crate::app::preview_geometry::BarInsets) {
+        let rotation = self
+            .preview_adjusted_rotation(self.current_frame_rotation, self.should_mirror_preview());
+        let (width, height) = if rotation.swaps_dimensions() {
+            (frame_height as f32, frame_width as f32)
+        } else {
+            (frame_width as f32, frame_height as f32)
+        };
+        (width, height, self.bar_insets())
+    }
+
     /// Build the composition guide overlay element.
     ///
     /// Passes the live state needed to compute the visible-video rectangle
@@ -36,12 +51,8 @@ impl AppModel {
             return empty_overlay();
         };
 
-        let rotation = self.current_frame_rotation;
-        let (rotated_w, rotated_h) = if rotation.swaps_dimensions() {
-            (frame.height as f32, frame.width as f32)
-        } else {
-            (frame.width as f32, frame.height as f32)
-        };
+        let (rotated_w, rotated_h, insets) =
+            self.composition_preview_geometry(frame.width, frame.height);
         if rotated_w < 1.0 || rotated_h < 1.0 {
             return empty_overlay();
         }
@@ -64,11 +75,36 @@ impl AppModel {
             rotated_h,
             aspect_crop_ratio,
             self.cover_blend(),
-            // Pass the *animated* top/bottom heights so the guide tracks
-            // the scrim through Photo↔View transitions; in View the bars
-            // settle at 0 and the guide aligns with the full window.
-            self.top_ui_height(),
-            self.bottom_ui_height(),
+            insets,
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backends::camera::types::SensorRotation;
+    use crate::backends::display_orientation::DisplayOrientation;
+    use crate::config::{Config, ControlsPosition};
+
+    #[test]
+    fn composition_geometry_matches_preview_rotation_and_side_insets() {
+        let model = AppModel {
+            config: Config {
+                controls_position: ControlsPosition::Left,
+                ..Config::default()
+            },
+            display_orientation: DisplayOrientation::Rotate270,
+            current_frame_rotation: SensorRotation::Rotate270,
+            screen_width: 733.0,
+            screen_height: 360.0,
+            ..AppModel::default()
+        };
+
+        let (width, height, insets) = model.composition_preview_geometry(1452, 1080);
+        assert_eq!((width, height), (1452.0, 1080.0));
+        assert_eq!(insets.top, 0.0);
+        assert_eq!(insets.bottom, 0.0);
+        assert!(insets.left > 0.0 || insets.right > 0.0);
     }
 }

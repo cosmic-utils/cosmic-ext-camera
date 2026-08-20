@@ -45,6 +45,13 @@ fn disabled_text(value: String) -> Element<'static, Message> {
         .into()
 }
 
+fn controls_position_index(position: crate::config::ControlsPosition) -> usize {
+    crate::config::ControlsPosition::ALL
+        .iter()
+        .position(|candidate| *candidate == position)
+        .unwrap_or(0)
+}
+
 impl AppModel {
     /// Build the Settings context drawer for the current sub-page.
     ///
@@ -537,7 +544,7 @@ impl AppModel {
         vec![timelapse_section.into()]
     }
 
-    /// Overlay sub-page: overlay effect and composition guide.
+    /// Overlay sub-page: overlay effect, composition guide, and controls position.
     fn overlay_sections(&self) -> Vec<Element<'_, Message>> {
         // Overlay effect index. Indexes `available()`, which is shorter
         // off-COSMIC — hence the shared mapping rather than a literal index.
@@ -547,6 +554,9 @@ impl AppModel {
             .iter()
             .position(|g| *g == self.config.composition_guide)
             .unwrap_or(0);
+
+        let current_controls_position_index =
+            controls_position_index(self.config.controls_position);
 
         let overlay_section = widget::settings::section()
             .title(fl!("settings-overlay"))
@@ -566,6 +576,15 @@ impl AppModel {
                         &self.composition_guide_dropdown_options,
                         Some(current_guide_index),
                         Message::SelectCompositionGuide,
+                    )),
+            )
+            .add(
+                widget::settings::item::builder(fl!("settings-controls-position"))
+                    .description(fl!("settings-controls-position-description"))
+                    .control(widget::dropdown(
+                        &self.controls_position_dropdown_options,
+                        Some(current_controls_position_index),
+                        Message::SetControlsPosition,
                     )),
             );
 
@@ -680,5 +699,18 @@ impl AppModel {
             .padding(8)
             .class(cosmic::theme::Container::Card)
             .into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ControlsPosition;
+
+    #[test]
+    fn overlay_controls_position_index_tracks_every_option() {
+        for (expected, position) in ControlsPosition::ALL.into_iter().enumerate() {
+            assert_eq!(controls_position_index(position), expected);
+        }
     }
 }

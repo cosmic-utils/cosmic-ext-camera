@@ -6,13 +6,17 @@
 //! Labels slide continuously with the finger during drag, then snap
 //! to the nearest mode center on release with an ease-out animation.
 
+use crate::app::bar_layout::Quarter;
 use crate::app::state::{CameraMode, Message};
 use crate::fl;
 use cosmic::iced::advanced::widget::Tree;
 use cosmic::iced::advanced::widget::tree;
 use cosmic::iced::advanced::{Clipboard, Shell, Widget, layout, renderer};
-use cosmic::iced::{Background, Border, Color, Element, Event, Length, Pixels, Rectangle, Size};
+use cosmic::iced::{
+    Background, Border, Color, Element, Event, Length, Pixels, Point, Rectangle, Size, Vector,
+};
 use cosmic::iced::{alignment, mouse, touch};
+use cosmic::widget::canvas::{Frame, Text as CanvasText};
 use cosmic::{Renderer, Theme};
 use iced_core::text::{self as iced_text, Text as IcedText};
 use std::time::Instant;
@@ -40,6 +44,8 @@ const DISABLED_OPACITY: f32 = 0.25;
 const LABEL_GAP: f32 = 2.0;
 /// Width of gallery/switch buttons (used for slide calculations)
 const BUTTON_WIDTH: f32 = 40.0;
+/// Side-axis length below which the compact phone layout is used.
+const COMPACT_SIDE_AXIS_MAX: f32 = 480.0;
 /// Maximum movement to still count as a tap (pixels)
 const TAP_THRESHOLD: f32 = 5.0;
 
@@ -172,9 +178,14 @@ pub struct ModeCarousel<'a> {
     /// pill — no extra padding around it. Used in View mode where the
     /// carousel stands alone without sibling buttons.
     fit_to_pill_when_collapsed: bool,
+    /// Quarter turn for the whole block when the device is held sideways.
+    /// `Quarter::None` in portrait - every code path is byte-identical to the
+    /// unrotated carousel then.
+    quarter: Quarter,
 }
 
 impl<'a> ModeCarousel<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         modes: Vec<CameraMode>,
         selected: CameraMode,
@@ -182,6 +193,7 @@ impl<'a> ModeCarousel<'a> {
         disabled: bool,
         slide_shared: std::sync::Arc<std::sync::atomic::AtomicU32>,
         fit_to_pill_when_collapsed: bool,
+        quarter: Quarter,
     ) -> Self {
         Self {
             modes,
@@ -190,6 +202,7 @@ impl<'a> ModeCarousel<'a> {
             disabled,
             slide_shared,
             fit_to_pill_when_collapsed,
+            quarter,
         }
     }
 
@@ -211,7 +224,13 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
     }
 
     fn size(&self) -> Size<Length> {
-        Size::new(Length::Shrink, Length::Fixed(CAROUSEL_HEIGHT))
+        if self.quarter == Quarter::None {
+            Size::new(Length::Shrink, Length::Fixed(CAROUSEL_HEIGHT))
+        } else {
+            // Sideways: the block's short axis (its "height" in portrait) is
+            // now the strip's width; its long axis runs down the strip.
+            Size::new(Length::Fixed(CAROUSEL_HEIGHT), Length::Shrink)
+        }
     }
 
     fn layout(
@@ -284,15 +303,10 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
         // Layout width fits 2 labels tightly, consistent regardless of selection.
         // With 2 modes this fits all; with 3+ the expand animation reveals the rest.
         // Use the 2 smallest labels so the size stays stable across mode switches.
-        let width = if state.label_widths.len() <= 2 {
-            total_strip_width(state)
-        } else {
-            let mut sorted: Vec<f32> = state.label_widths.clone();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
-            sorted[0] + sorted[1] + LABEL_GAP
-        }
-        .min(limits.max().width);
-        layout::Node::new(Size::new(width, CAROUSEL_HEIGHT))
+        // The long axis of the block. In portrait it's the node width; when
+        // rotated it runs down the strip and becomes the node height.
+        let long = content_long(&state.label_widths);
+        layout::Node::new(carousel_node_size(self.quarter, long, limits))
     }
 
     fn draw(
@@ -305,7 +319,16 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
         _cursor: mouse::Cursor,
         viewport: &Rectangle,
     ) {
-        let bounds = layout.bounds();
+        // The layout node is the on-screen (strip) rectangle. All the carousel
+        // geometry below is computed in *portrait* space - a horizontal block
+        // with the same origin but width/height un-swapped - and the emitted
+        // quads/text are turned back into strip space at the end. In portrait
+        // (`Quarter::None`) `portrait_*` are the identity, so this is
+        // byte-identical to the unrotated carousel.
+        let strip_bounds = layout.bounds();
+        let quarter = self.quarter;
+        let bounds = portrait_bounds(quarter, strip_bounds);
+        let viewport_p = portrait_viewport(quarter, *viewport);
         let state = tree.state.downcast_ref::<CarouselState>();
 
         if state.label_centers.is_empty() {
@@ -376,32 +399,17 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
         // Stage 1 fade zone width
         let fade_w = fade_w_max * expand;
 
-        // Stage 2: extend enough to show all labels plus fade zones.
-        // The fade zones sit outside the label area so labels aren't obscured.
-        // Buttons slide outward in sync (mod.rs reads shared atomic).
-        let spacing = cosmic::theme::spacing();
-        let needed_per_side = compute_needed_per_side(bounds.width, state);
-
-        // Stage 2 adds what's needed beyond stage 1's fade zone
-        let stage2_extra = (needed_per_side - fade_w_max).max(0.0) * full_expand;
-
-        // Compute available gap from carousel edge to button edge
-        let button_spacing = spacing.space_s as f32;
-        let padding = spacing.space_m as f32;
-        let gap = (bounds.x - padding - BUTTON_WIDTH).max(0.0);
-        let avail = gap - button_spacing;
-        let viewport_half = (viewport.width - bounds.width) / 2.0;
-        // On narrow screens, stage 1 stays within the gap; stage 2 expands
-        // toward viewport edges while buttons slide off-screen.
-        let extend = if needed_per_side <= avail {
-            // Enough space — normal expansion within gap
-            (fade_w + stage2_extra).min(needed_per_side)
-        } else {
-            // Not enough space — stage 1 within gap, stage 2 toward viewport
-            let s1 = fade_w.min(avail);
-            let target = viewport_half.min(needed_per_side);
-            s1 + (target - s1).max(0.0) * full_expand
-        };
+        // Resolve expansion against the carousel's physical long axis. For a
+        // side strip that is screen Y, not the synthetic portrait-space X.
+        let axis_bounds = button_axis_bounds(quarter, strip_bounds, bounds);
+        let extend = carousel_extension_for_progress(
+            axis_bounds,
+            viewport_p,
+            state,
+            expand,
+            full_expand,
+            quarter != Quarter::None,
+        );
         // Button slide is computed in update() via compute_button_slide()
         // to avoid side effects in draw().
 
@@ -446,160 +454,211 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
         let bg_radius: [f32; 4] = cosmic.corner_radii.radius_xl.map(|cr| cr.min(max_radius));
 
         use cosmic::iced::advanced::Renderer as _;
-        renderer.with_layer(render_bounds, |renderer| {
-            renderer.fill_quad(
-                renderer::Quad {
-                    bounds: render_bounds,
-                    border: Border {
-                        color: Color::TRANSPARENT,
-                        width: 0.0,
-                        radius: bg_radius.into(),
+        renderer.with_layer(
+            strip_rect(quarter, strip_bounds, render_bounds),
+            |renderer| {
+                renderer.fill_quad(
+                    renderer::Quad {
+                        bounds: strip_rect(quarter, strip_bounds, render_bounds),
+                        border: Border {
+                            color: Color::TRANSPARENT,
+                            width: 0.0,
+                            radius: permute_radii(quarter, bg_radius).into(),
+                        },
+                        shadow: Default::default(),
+                        snap: true,
                     },
-                    shadow: Default::default(),
-                    snap: true,
-                },
-                Background::Color(bg_color),
-            );
+                    Background::Color(bg_color),
+                );
 
-            // Draw animated pill background (smoothly slides between modes)
-            if state.pill_initialized {
-                let pill_pad = 2.0;
-                let pill_x = bounds.x + state.pill_center + visual_offset - state.pill_width / 2.0;
-                let pill_y = bounds.y + pill_pad;
-                let pill_h = bounds.height - pill_pad * 2.0;
+                // Draw animated pill background (smoothly slides between modes)
+                if state.pill_initialized {
+                    let pill_pad = 2.0;
+                    let pill_x =
+                        bounds.x + state.pill_center + visual_offset - state.pill_width / 2.0;
+                    let pill_y = bounds.y + pill_pad;
+                    let pill_h = bounds.height - pill_pad * 2.0;
 
-                // Clamp pill to stay within the background bounds so it doesn't
-                // extend past the carousel's rounded corners.
-                let clamped_left = pill_x.max(render_bounds.x);
-                let clamped_right =
-                    (pill_x + state.pill_width).min(render_bounds.x + render_bounds.width);
-                let clamped_w = (clamped_right - clamped_left).max(0.0);
+                    // Clamp pill to stay within the background bounds so it doesn't
+                    // extend past the carousel's rounded corners.
+                    let clamped_left = pill_x.max(render_bounds.x);
+                    let clamped_right =
+                        (pill_x + state.pill_width).min(render_bounds.x + render_bounds.width);
+                    let clamped_w = (clamped_right - clamped_left).max(0.0);
 
-                if clamped_w > 0.0 {
-                    let pill_bounds = Rectangle {
-                        x: clamped_left,
-                        y: pill_y,
-                        width: clamped_w,
-                        height: pill_h,
+                    if clamped_w > 0.0 {
+                        let pill_bounds = Rectangle {
+                            x: clamped_left,
+                            y: pill_y,
+                            width: clamped_w,
+                            height: pill_h,
+                        };
+
+                        // Use background radius on sides that touch the carousel edge,
+                        // pill radius on interior sides.
+                        let pill_max_r = pill_h / 2.0;
+                        let pill_r: [f32; 4] =
+                            cosmic.corner_radii.radius_xl.map(|cr| cr.min(pill_max_r));
+                        let touches_left = pill_x < render_bounds.x + 0.5;
+                        let touches_right =
+                            pill_x + state.pill_width > render_bounds.x + render_bounds.width - 0.5;
+
+                        // CSS order: TL, TR, BR, BL
+                        let final_r: [f32; 4] = [
+                            if touches_left {
+                                bg_radius[0]
+                            } else {
+                                pill_r[0]
+                            },
+                            if touches_right {
+                                bg_radius[1]
+                            } else {
+                                pill_r[1]
+                            },
+                            if touches_right {
+                                bg_radius[2]
+                            } else {
+                                pill_r[2]
+                            },
+                            if touches_left {
+                                bg_radius[3]
+                            } else {
+                                pill_r[3]
+                            },
+                        ];
+
+                        renderer.fill_quad(
+                            renderer::Quad {
+                                bounds: strip_rect(quarter, strip_bounds, pill_bounds),
+                                border: Border {
+                                    color: Color::TRANSPARENT,
+                                    width: 0.0,
+                                    radius: permute_radii(quarter, final_r).into(),
+                                },
+                                shadow: Default::default(),
+                                snap: true,
+                            },
+                            Background::Color(Color::from_rgba(
+                                accent.red,
+                                accent.green,
+                                accent.blue,
+                                accent_alpha,
+                            )),
+                        );
+                    }
+                }
+
+                // When rotated, labels are the only thing that needs a real
+                // rotation (quads stay axis-aligned). Collect them into a canvas
+                // Frame whose transform turns the whole strip-anchored block: draw
+                // each glyph run at its portrait-local position, let the frame
+                // rotate them, then emit the tessellated geometry once. In portrait
+                // this frame is never created and the direct `fill_text` path runs.
+                let mut text_frame = if quarter != Quarter::None {
+                    let mut frame = Frame::new(renderer, viewport.size());
+                    let (tx, ty) = match quarter {
+                        Quarter::Ccw90 => (strip_bounds.x, strip_bounds.y + strip_bounds.height),
+                        Quarter::Cw90 => (strip_bounds.x + strip_bounds.width, strip_bounds.y),
+                        Quarter::None => unreachable!(),
+                    };
+                    frame.translate(Vector::new(tx, ty));
+                    frame.rotate(quarter.radians());
+                    Some(frame)
+                } else {
+                    None
+                };
+
+                // Render all labels (in the expanded area during drag)
+                for (i, _mode) in self.modes.iter().enumerate() {
+                    let label_w = state.label_widths[i];
+                    let label_center = state.label_centers[i];
+                    let label_x = bounds.x + label_center + visual_offset - label_w / 2.0;
+
+                    // Skip labels fully outside the render area
+                    if label_x + label_w < render_bounds.x
+                        || label_x > render_bounds.x + render_bounds.width
+                    {
+                        continue;
+                    }
+
+                    let label_bounds = Rectangle {
+                        x: label_x,
+                        y: bounds.y,
+                        width: label_w,
+                        height: bounds.height,
                     };
 
-                    // Use background radius on sides that touch the carousel edge,
-                    // pill radius on interior sides.
-                    let pill_max_r = pill_h / 2.0;
-                    let pill_r: [f32; 4] =
-                        cosmic.corner_radii.radius_xl.map(|cr| cr.min(pill_max_r));
-                    let touches_left = pill_x < render_bounds.x + 0.5;
-                    let touches_right =
-                        pill_x + state.pill_width > render_bounds.x + render_bounds.width - 0.5;
+                    let is_highlighted = i == highlighted_idx;
 
-                    // CSS order: TL, TR, BR, BL
-                    let final_r: [f32; 4] = [
-                        if touches_left {
-                            bg_radius[0]
-                        } else {
-                            pill_r[0]
-                        },
-                        if touches_right {
-                            bg_radius[1]
-                        } else {
-                            pill_r[1]
-                        },
-                        if touches_right {
-                            bg_radius[2]
-                        } else {
-                            pill_r[2]
-                        },
-                        if touches_left {
-                            bg_radius[3]
-                        } else {
-                            pill_r[3]
-                        },
-                    ];
+                    // Use cached label strings to avoid fl!() allocations in the draw path
+                    let label_text = state.label_strings.get(i).cloned().unwrap_or_default();
+                    let on_bg: Color = cosmic.on_bg_color().into();
+                    let text_color = if is_highlighted {
+                        on_bg
+                    } else {
+                        Color::from_rgba(on_bg.r, on_bg.g, on_bg.b, inactive_alpha)
+                    };
 
-                    renderer.fill_quad(
-                        renderer::Quad {
-                            bounds: pill_bounds,
-                            border: Border {
-                                color: Color::TRANSPARENT,
-                                width: 0.0,
-                                radius: final_r.into(),
+                    let font = if is_highlighted {
+                        cosmic::font::bold()
+                    } else {
+                        cosmic::font::default()
+                    };
+
+                    // With Alignment::Center, position is the CENTER point of the text
+                    if let Some(frame) = text_frame.as_mut() {
+                        // Position is the label centre expressed in portrait-local
+                        // coordinates (relative to the block origin); the frame's
+                        // translate+rotate turns it into the strip. Same size and
+                        // centre-alignment as the portrait path, so glyph metrics
+                        // are unchanged - only the whole run is rotated.
+                        let centre = label_bounds.center();
+                        let mut text = CanvasText::from(label_text);
+                        text.position = Point::new(centre.x - bounds.x, centre.y - bounds.y);
+                        text.color = text_color;
+                        text.size = Pixels(FONT_SIZE);
+                        text.font = font;
+                        text.align_x = iced_text::Alignment::Center;
+                        text.align_y = alignment::Vertical::Center;
+                        text.shaping = iced_text::Shaping::Advanced;
+                        frame.fill_text(text);
+                    } else {
+                        iced_text::Renderer::fill_text(
+                            renderer,
+                            IcedText {
+                                content: label_text,
+                                bounds: label_bounds.size(),
+                                size: Pixels(FONT_SIZE),
+                                line_height: iced_text::LineHeight::default(),
+                                font,
+                                align_x: iced_text::Alignment::Center,
+                                align_y: alignment::Vertical::Center,
+                                shaping: iced_text::Shaping::Advanced,
+                                wrapping: iced_text::Wrapping::default(),
+                                ellipsize: iced_text::Ellipsize::default(),
                             },
-                            shadow: Default::default(),
-                            snap: true,
-                        },
-                        Background::Color(Color::from_rgba(
-                            accent.red,
-                            accent.green,
-                            accent.blue,
-                            accent_alpha,
-                        )),
-                    );
-                }
-            }
-
-            // Render all labels (in the expanded area during drag)
-            for (i, _mode) in self.modes.iter().enumerate() {
-                let label_w = state.label_widths[i];
-                let label_center = state.label_centers[i];
-                let label_x = bounds.x + label_center + visual_offset - label_w / 2.0;
-
-                // Skip labels fully outside the render area
-                if label_x + label_w < render_bounds.x
-                    || label_x > render_bounds.x + render_bounds.width
-                {
-                    continue;
+                            label_bounds.center(),
+                            text_color,
+                            render_bounds,
+                        );
+                    }
                 }
 
-                let label_bounds = Rectangle {
-                    x: label_x,
-                    y: bounds.y,
-                    width: label_w,
-                    height: bounds.height,
-                };
-
-                let is_highlighted = i == highlighted_idx;
-
-                // Use cached label strings to avoid fl!() allocations in the draw path
-                let label_text = state.label_strings.get(i).cloned().unwrap_or_default();
-                let on_bg: Color = cosmic.on_bg_color().into();
-                let text_color = if is_highlighted {
-                    on_bg
-                } else {
-                    Color::from_rgba(on_bg.r, on_bg.g, on_bg.b, inactive_alpha)
-                };
-
-                let font = if is_highlighted {
-                    cosmic::font::bold()
-                } else {
-                    cosmic::font::default()
-                };
-
-                // With Alignment::Center, position is the CENTER point of the text
-                iced_text::Renderer::fill_text(
-                    renderer,
-                    IcedText {
-                        content: label_text,
-                        bounds: label_bounds.size(),
-                        size: Pixels(FONT_SIZE),
-                        line_height: iced_text::LineHeight::default(),
-                        font,
-                        align_x: iced_text::Alignment::Center,
-                        align_y: alignment::Vertical::Center,
-                        shaping: iced_text::Shaping::Advanced,
-                        wrapping: iced_text::Wrapping::default(),
-                        ellipsize: iced_text::Ellipsize::default(),
-                    },
-                    label_bounds.center(),
-                    text_color,
-                    render_bounds,
-                );
-            }
-        });
+                // Emit the rotated label geometry once, on top of the quads.
+                if let Some(frame) = text_frame {
+                    use iced_wgpu::graphics::geometry::Renderer as _;
+                    renderer.draw_geometry(frame.into_geometry());
+                }
+            },
+        );
 
         // Draw fade overlays in a SEPARATE layer so they composite
         // on top of BOTH text and quads from the previous layer.
         // Skip when fade_w is too small to produce a visible gradient (avoids 1px artifacts).
-        if fade_w > 2.0 {
+        // The edge fades run along the block's long axis; rotating them onto the
+        // strip is a later task, so they are disabled while rotated (the labels
+        // and pill carry the interaction; only the soft gradient is missing).
+        if fade_w > 2.0 && quarter == Quarter::None {
             renderer.with_layer(render_bounds, |renderer| {
                 use iced_wgpu::primitive::Renderer as PrimitiveRenderer;
 
@@ -654,7 +713,15 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) {
-        let bounds = layout.bounds();
+        // Work in portrait space (see `draw`): all hit-testing below runs
+        // against the un-rotated block, and every incoming pointer is mapped
+        // back into that space first via `remap`. In portrait `remap` and
+        // `portrait_*` are the identity, so behaviour is unchanged.
+        let strip_bounds = layout.bounds();
+        let quarter = self.quarter;
+        let bounds = portrait_bounds(quarter, strip_bounds);
+        let viewport_p = portrait_viewport(quarter, *_viewport);
+        let remap = |p: Point| remap_pointer(quarter, strip_bounds, p);
         let state = tree.state.downcast_mut::<CarouselState>();
 
         // Tick animations here — update() runs on events including redraw requests.
@@ -664,7 +731,8 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
 
         // Update button slide position from update() (not draw()) to avoid
         // side effects in the rendering pass.
-        let inward = compute_button_slide(bounds, _viewport, state);
+        let button_bounds = button_axis_bounds(quarter, strip_bounds, bounds);
+        let inward = button_slide_for_orientation(quarter, button_bounds, viewport_p, state);
         self.slide_shared
             .store(inward.to_bits(), std::sync::atomic::Ordering::Relaxed);
 
@@ -675,9 +743,10 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
         match event {
             // === Touch events ===
             Event::Touch(touch::Event::FingerPressed { id, position })
-                if visual_bounds(bounds, state).contains(*position)
+                if visual_bounds(bounds, state).contains(remap(*position))
                     && state.active_finger.is_none() =>
             {
+                let position = remap(*position);
                 interrupt_animation(state);
                 start_expand(state);
                 // Interrupt any running stage 2 collapse so it doesn't
@@ -698,6 +767,7 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
             Event::Touch(touch::Event::FingerMoved { id, position })
                 if state.active_finger == Some(*id) =>
             {
+                let position = remap(*position);
                 if let Some(start_x) = state.drag_start_x {
                     let raw = state.drag_base_offset + (position.x - start_x);
                     state.drag_offset =
@@ -738,6 +808,7 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
             // === Mouse events ===
             Event::Mouse(mouse::Event::ButtonPressed(mouse::Button::Left)) => {
                 if let Some(pos) = cursor.position() {
+                    let pos = remap(pos);
                     let vb = visual_bounds(bounds, state);
                     if vb.contains(pos) && state.active_finger.is_none() {
                         interrupt_animation(state);
@@ -758,6 +829,7 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
                 }
             }
             Event::Mouse(mouse::Event::CursorMoved { position }) => {
+                let position = remap(*position);
                 if let Some(start_x) = state.drag_start_x
                     && state.active_finger.is_none()
                 {
@@ -774,8 +846,8 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
 
                 // Hover detection: expand only when over the carousel itself,
                 // but stay expanded (and abort collapse) when over adjacent buttons.
-                let over_carousel = visual_bounds(bounds, state).contains(*position);
-                let over_area = hover_bounds(bounds, state).contains(*position);
+                let over_carousel = visual_bounds(bounds, state).contains(position);
+                let over_area = hover_bounds(bounds, state).contains(position);
                 if over_carousel && !state.hovered_carousel {
                     // Entering the carousel — trigger expansion + hold timer
                     state.hovered = true;
@@ -839,10 +911,10 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
                 // Check if cursor is still over carousel or adjacent buttons
                 let over_carousel = cursor
                     .position()
-                    .is_some_and(|p| visual_bounds(bounds, state).contains(p));
+                    .is_some_and(|p| visual_bounds(bounds, state).contains(remap(p)));
                 let over_area = cursor
                     .position()
-                    .is_some_and(|p| hover_bounds(bounds, state).contains(p));
+                    .is_some_and(|p| hover_bounds(bounds, state).contains(remap(p)));
                 state.hovered = over_area;
                 if over_carousel {
                     // Over carousel — stay expanded, reset hold timer
@@ -873,12 +945,9 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
             Event::Mouse(mouse::Event::WheelScrolled { delta })
                 if cursor
                     .position()
-                    .is_some_and(|p| visual_bounds(bounds, state).contains(p)) =>
+                    .is_some_and(|p| visual_bounds(bounds, state).contains(remap(p))) =>
             {
-                let scroll = match delta {
-                    mouse::ScrollDelta::Lines { x, .. } => *x,
-                    mouse::ScrollDelta::Pixels { x, .. } => *x / 50.0,
-                };
+                let scroll = wheel_scroll(quarter, delta);
                 let idx = self.selected_index();
                 if scroll < -0.5 && idx + 1 < self.modes.len() {
                     shell.publish((self.on_select)(self.modes[idx + 1]));
@@ -901,12 +970,14 @@ impl<'a> Widget<Message, Theme, Renderer> for ModeCarousel<'a> {
         _renderer: &Renderer,
     ) -> mouse::Interaction {
         let state = tree.state.downcast_ref::<CarouselState>();
+        let strip_bounds = layout.bounds();
+        let bounds = portrait_bounds(self.quarter, strip_bounds);
         if state.active_finger.is_some() || state.drag_start_x.is_some() {
             mouse::Interaction::Grabbing
         } else if !self.disabled
-            && cursor
-                .position()
-                .is_some_and(|p| visual_bounds(layout.bounds(), state).contains(p))
+            && cursor.position().is_some_and(|p| {
+                visual_bounds(bounds, state).contains(remap_pointer(self.quarter, strip_bounds, p))
+            })
         {
             mouse::Interaction::Pointer
         } else {
@@ -922,8 +993,113 @@ impl<'a> From<ModeCarousel<'a>> for Element<'a, Message, Theme, Renderer> {
 }
 
 // ============================================================================
+// Rotation geometry (sideways strip)
+// ============================================================================
+//
+// The carousel is authored horizontally ("portrait" space). When the device is
+// held sideways the block turns a quarter along the strip. We keep all the
+// internal layout/spacing/drag math horizontal and only remap coordinates:
+//
+//   * `portrait_bounds` / `portrait_viewport` un-swap the axes so the math runs
+//     against the block as if it were still horizontal, anchored at the strip's
+//     origin.
+//   * `strip_point` / `strip_rect` turn a portrait rectangle (a quad) back into
+//     the strip - a 90° turn of an axis-aligned rect stays axis-aligned.
+//   * `remap_pointer` is the inverse: it maps an incoming pointer in strip space
+//     back into portrait space so the existing hit-testing is untouched.
+//
+// Every function is the identity for `Quarter::None`, so portrait is unchanged.
+
+/// The block laid out horizontally: same origin, width/height un-swapped.
+pub(super) fn portrait_bounds(quarter: Quarter, bounds: Rectangle) -> Rectangle {
+    match quarter {
+        Quarter::None => bounds,
+        Quarter::Cw90 | Quarter::Ccw90 => Rectangle {
+            x: bounds.x,
+            y: bounds.y,
+            width: bounds.height,
+            height: bounds.width,
+        },
+    }
+}
+
+/// The viewport with its axes un-swapped, matching `portrait_bounds`.
+fn portrait_viewport(quarter: Quarter, viewport: Rectangle) -> Rectangle {
+    match quarter {
+        Quarter::None => viewport,
+        Quarter::Cw90 | Quarter::Ccw90 => Rectangle {
+            x: viewport.y,
+            y: viewport.x,
+            width: viewport.height,
+            height: viewport.width,
+        },
+    }
+}
+
+/// Map a point from portrait space into the on-screen strip space.
+/// `bounds` is the strip (layout) rectangle. Inverse of [`remap_pointer`].
+fn strip_point(quarter: Quarter, bounds: Rectangle, p: Point) -> Point {
+    let a = p.x - bounds.x; // along the row (portrait X)
+    let b = p.y - bounds.y; // across the row (portrait Y)
+    match quarter {
+        Quarter::None => p,
+        Quarter::Ccw90 => Point::new(bounds.x + b, bounds.y + bounds.height - a),
+        Quarter::Cw90 => Point::new(bounds.x + bounds.width - b, bounds.y + a),
+    }
+}
+
+/// Turn a portrait-space axis-aligned rectangle into its strip-space rectangle.
+pub(super) fn strip_rect(quarter: Quarter, bounds: Rectangle, r: Rectangle) -> Rectangle {
+    if quarter == Quarter::None {
+        return r;
+    }
+    let a = strip_point(quarter, bounds, Point::new(r.x, r.y));
+    let c = strip_point(quarter, bounds, Point::new(r.x + r.width, r.y + r.height));
+    Rectangle {
+        x: a.x.min(c.x),
+        y: a.y.min(c.y),
+        width: (a.x - c.x).abs(),
+        height: (a.y - c.y).abs(),
+    }
+}
+
+/// Permute CSS corner radii `[TL, TR, BR, BL]` to follow the quarter turn so a
+/// rounded quad keeps its rounded corners on the same physical edges.
+pub(super) fn permute_radii(quarter: Quarter, r: [f32; 4]) -> [f32; 4] {
+    match quarter {
+        Quarter::None => r,
+        Quarter::Ccw90 => [r[1], r[2], r[3], r[0]],
+        Quarter::Cw90 => [r[3], r[0], r[1], r[2]],
+    }
+}
+
+/// Map an incoming pointer in strip space back into the carousel's portrait
+/// space so the existing hit-testing (drag / snap / tap thresholds) is unchanged.
+/// Inverse of [`strip_point`]. Identity for `Quarter::None`.
+pub(super) fn remap_pointer(quarter: Quarter, bounds: Rectangle, p: Point) -> Point {
+    let u = p.x - bounds.x;
+    let v = p.y - bounds.y;
+    match quarter {
+        Quarter::None => p,
+        Quarter::Ccw90 => Point::new(bounds.x + bounds.height - v, bounds.y + u),
+        Quarter::Cw90 => Point::new(bounds.x + v, bounds.y + bounds.width - u),
+    }
+}
+
+// ============================================================================
 // Helper functions
 // ============================================================================
+
+fn wheel_scroll(quarter: Quarter, delta: &mouse::ScrollDelta) -> f32 {
+    match (quarter, delta) {
+        (Quarter::None, mouse::ScrollDelta::Lines { x, .. }) => *x,
+        (Quarter::None, mouse::ScrollDelta::Pixels { x, .. }) => *x / 50.0,
+        (Quarter::Cw90, mouse::ScrollDelta::Lines { y, .. }) => *y,
+        (Quarter::Cw90, mouse::ScrollDelta::Pixels { y, .. }) => *y / 50.0,
+        (Quarter::Ccw90, mouse::ScrollDelta::Lines { y, .. }) => -*y,
+        (Quarter::Ccw90, mouse::ScrollDelta::Pixels { y, .. }) => -*y / 50.0,
+    }
+}
 
 /// Get the localized display label for a camera mode.
 fn mode_label(mode: CameraMode) -> String {
@@ -959,6 +1135,28 @@ pub fn carousel_width_for_modes(modes: &[CameraMode]) -> f32 {
         widths.sort_by(|a, b| a.partial_cmp(b).unwrap());
         widths[0] + widths[1] + LABEL_GAP
     }
+}
+
+/// Collapsed space from a rotated carousel to each sibling button. Spacious
+/// windows reserve medium expansion; compact windows keep the normal gap and
+/// let the expansion animation move the buttons out of its way.
+pub fn sideways_sibling_spacing_for_modes(modes: &[CameraMode], viewport_long_axis: f32) -> f32 {
+    let spacing = cosmic::theme::spacing();
+    if viewport_long_axis > 0.0 && viewport_long_axis <= COMPACT_SIDE_AXIS_MAX {
+        spacing.space_m as f32
+    } else {
+        carousel_width_for_modes(modes) / 4.0 + spacing.space_s as f32
+    }
+}
+
+fn sideways_reserved_extension(carousel_long: f32, viewport_long_axis: f32) -> f32 {
+    let spacing = cosmic::theme::spacing();
+    (if viewport_long_axis > 0.0 && viewport_long_axis <= COMPACT_SIDE_AXIS_MAX {
+        spacing.space_m as f32
+    } else {
+        carousel_long / 4.0 + spacing.space_s as f32
+    } - spacing.space_s as f32)
+        .max(0.0)
 }
 
 /// Recalculate label widths, center positions, and cached label strings.
@@ -1011,6 +1209,37 @@ fn visual_bounds(bounds: Rectangle, state: &CarouselState) -> Rectangle {
         y: bounds.y,
         width: bounds.width + ext * 2.0,
         height: bounds.height,
+    }
+}
+
+/// The carousel's natural along-block content length (its "long" axis): the
+/// full label strip for ≤2 modes, otherwise the two narrowest labels (so the
+/// size is stable across mode switches). This is the compact *collapsed* size -
+/// the expansion animation is drawn BEYOND the layout node (see `render_bounds`
+/// / `with_layer`), so the node itself never needs the whole lane length.
+fn content_long(label_widths: &[f32]) -> f32 {
+    if label_widths.len() <= 2 {
+        let total: f32 = label_widths.iter().sum();
+        total + label_widths.len().saturating_sub(1) as f32 * LABEL_GAP
+    } else {
+        let mut sorted: Vec<f32> = label_widths.to_vec();
+        sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        sorted[0] + sorted[1] + LABEL_GAP
+    }
+}
+
+/// The on-screen layout node size for the carousel given its content length and
+/// the available `limits`. Rotated (`quarter != None`) the block's fixed
+/// thickness (`CAROUSEL_HEIGHT`) crosses the strip while the content length runs
+/// DOWN it - bounded to the compact content, so a `Fill`-height group lane never
+/// inflates the node to the whole strip (which would push the gallery/switcher
+/// far from the pill and defeat the compact, centred stack). Portrait is the
+/// axis-swap of the same rule and is byte-identical to before.
+fn carousel_node_size(quarter: Quarter, long: f32, limits: &layout::Limits) -> Size<f32> {
+    if quarter == Quarter::None {
+        Size::new(long.min(limits.max().width), CAROUSEL_HEIGHT)
+    } else {
+        Size::new(CAROUSEL_HEIGHT, long.min(limits.max().height))
     }
 }
 
@@ -1216,6 +1445,61 @@ fn compute_needed_per_side(bounds_width: f32, state: &CarouselState) -> f32 {
     let spacing = cosmic::theme::spacing();
     let label_padding = spacing.space_xs as f32;
     ((strip_w + label_padding * 2.0 - bounds_width) / 2.0 + fade_w_max).max(0.0)
+}
+
+fn carousel_extension_for_progress(
+    bounds: Rectangle,
+    viewport: Rectangle,
+    state: &CarouselState,
+    expand: f32,
+    full_expand: f32,
+    reserve_medium: bool,
+) -> f32 {
+    let fade_w_max = bounds.width / 4.0;
+    let fade_w = fade_w_max * expand;
+    let needed_per_side = compute_needed_per_side(bounds.width, state);
+    let stage2_extra = (needed_per_side - fade_w_max).max(0.0) * full_expand;
+    let spacing = cosmic::theme::spacing();
+    let button_spacing = spacing.space_s as f32;
+    let padding = spacing.space_m as f32;
+    let gap = (bounds.x - padding - BUTTON_WIDTH).max(0.0);
+    let avail = (gap - button_spacing).max(0.0);
+    let viewport_half = (viewport.width - bounds.width) / 2.0;
+
+    if needed_per_side <= avail {
+        (fade_w + stage2_extra).min(needed_per_side)
+    } else {
+        // Side layouts reserve stage one in their sibling spacing. Portrait
+        // retains its established behavior of fitting stage one in the actual
+        // leading gap.
+        let medium = if reserve_medium {
+            fade_w.min(fade_w_max)
+        } else {
+            fade_w.min(avail)
+        };
+        let target = viewport_half.min(needed_per_side);
+        medium + (target - medium).max(0.0) * full_expand
+    }
+}
+
+#[cfg(test)]
+fn carousel_extension(
+    quarter: Quarter,
+    strip_bounds: Rectangle,
+    viewport: Rectangle,
+    state: &CarouselState,
+) -> f32 {
+    let portrait = portrait_bounds(quarter, strip_bounds);
+    let viewport = portrait_viewport(quarter, viewport);
+    let axis_bounds = button_axis_bounds(quarter, strip_bounds, portrait);
+    carousel_extension_for_progress(
+        axis_bounds,
+        viewport,
+        state,
+        state.expand_t,
+        state.full_expand_t,
+        quarter != Quarter::None,
+    )
 }
 
 /// Get the current visual offset accounting for drag or snap animation.
@@ -1543,6 +1827,46 @@ pub fn resting_button_slide(bounds: Rectangle) -> f32 {
     gap - fade_w_max - button_spacing
 }
 
+/// Portrait buttons need absolute placement. Sideways siblings already reserve
+/// stage-one growth in layout, so they move only for extra stage-two growth.
+fn button_slide_for_orientation(
+    quarter: Quarter,
+    bounds: Rectangle,
+    viewport: Rectangle,
+    state: &CarouselState,
+) -> f32 {
+    if quarter == Quarter::None {
+        compute_button_slide(bounds, &viewport, state)
+    } else {
+        let reserved = sideways_reserved_extension(bounds.width, viewport.width);
+        let extension = carousel_extension_for_progress(
+            bounds,
+            viewport,
+            state,
+            state.expand_t,
+            state.full_expand_t,
+            true,
+        );
+        -(extension - reserved).max(0.0)
+    }
+}
+
+/// Geometry for sibling-button clearance along the carousel's physical axis.
+/// The carousel renderer works in synthetic portrait space, but landscape
+/// siblings move along screen Y, so their edge distances must use Y/height.
+fn button_axis_bounds(quarter: Quarter, strip_bounds: Rectangle, portrait: Rectangle) -> Rectangle {
+    if quarter == Quarter::None {
+        portrait
+    } else {
+        Rectangle {
+            x: strip_bounds.y,
+            y: strip_bounds.x,
+            width: strip_bounds.height,
+            height: strip_bounds.width,
+        }
+    }
+}
+
 /// Compute the button inward slide distance for the current animation state.
 /// Called from `update()` so the value is fresh each event cycle without
 /// mutating state inside `draw()`.
@@ -1610,5 +1934,356 @@ fn rubber_band_offset(
         max_left - dampened
     } else {
         raw_offset
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn side_carousel_wheel_uses_vertical_scroll_delta() {
+        let vertical_lines = mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 };
+        let horizontal_lines = mouse::ScrollDelta::Lines { x: -1.0, y: 0.0 };
+        let vertical_pixels = mouse::ScrollDelta::Pixels { x: 0.0, y: 75.0 };
+
+        assert_eq!(wheel_scroll(Quarter::Cw90, &vertical_lines), -1.0);
+        assert_eq!(wheel_scroll(Quarter::Cw90, &horizontal_lines), 0.0);
+        assert_eq!(wheel_scroll(Quarter::Ccw90, &vertical_pixels), -1.5);
+        assert_eq!(wheel_scroll(Quarter::None, &horizontal_lines), -1.0);
+    }
+
+    #[test]
+    fn mirrored_side_carousels_reverse_wheel_direction() {
+        let down = mouse::ScrollDelta::Lines { x: 0.0, y: -1.0 };
+        assert_eq!(wheel_scroll(Quarter::Cw90, &down), -1.0);
+        assert_eq!(wheel_scroll(Quarter::Ccw90, &down), 1.0);
+    }
+
+    #[test]
+    fn manual_side_layout_uses_the_strip_y_axis_for_expansion_room() {
+        let strip = Rectangle {
+            x: 0.0,
+            y: 240.0,
+            width: CAROUSEL_HEIGHT,
+            height: 160.0,
+        };
+        let viewport = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 360.0,
+            height: 733.0,
+        };
+        let mut state = CarouselState {
+            label_widths: vec![64.0, 72.0, 72.0, 104.0, 88.0],
+            expand_t: 1.0,
+            ..Default::default()
+        };
+
+        let medium = carousel_extension(Quarter::Cw90, strip, viewport, &state);
+        state.full_expand_t = 1.0;
+        let full = carousel_extension(Quarter::Cw90, strip, viewport, &state);
+
+        assert!((medium - strip.height / 4.0).abs() < 0.001);
+        assert!(full > medium);
+    }
+
+    #[test]
+    fn sideways_layout_reserves_medium_expansion_plus_button_gap() {
+        let modes = [CameraMode::Photo, CameraMode::Video, CameraMode::Timelapse];
+        let spacing = cosmic::theme::spacing();
+
+        assert_eq!(
+            sideways_sibling_spacing_for_modes(&modes, 733.0),
+            carousel_width_for_modes(&modes) / 4.0 + spacing.space_s as f32
+        );
+    }
+
+    #[test]
+    fn compact_side_layout_uses_normal_collapsed_spacing() {
+        let modes = [CameraMode::Photo, CameraMode::Video, CameraMode::Timelapse];
+
+        assert_eq!(
+            sideways_sibling_spacing_for_modes(&modes, 360.0),
+            cosmic::theme::spacing().space_m as f32
+        );
+    }
+
+    #[test]
+    fn compact_side_buttons_move_during_medium_expansion() {
+        let bounds = Rectangle {
+            x: 100.0,
+            y: 20.0,
+            width: 160.0,
+            height: 40.0,
+        };
+        let viewport = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 360.0,
+            height: 313.0,
+        };
+        let mut state = CarouselState {
+            label_widths: vec![64.0, 72.0, 72.0, 104.0, 88.0],
+            ..Default::default()
+        };
+
+        assert_eq!(
+            button_slide_for_orientation(Quarter::Cw90, bounds, viewport, &state),
+            0.0
+        );
+        state.expand_t = 1.0;
+        assert!(button_slide_for_orientation(Quarter::Cw90, bounds, viewport, &state) < 0.0);
+    }
+
+    #[test]
+    fn sideways_button_slide_starts_at_zero() {
+        let bounds = Rectangle {
+            x: 100.0,
+            y: 20.0,
+            width: 160.0,
+            height: 40.0,
+        };
+        let viewport = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 780.0,
+            height: 313.0,
+        };
+        let state = CarouselState::default();
+
+        assert_eq!(
+            button_slide_for_orientation(Quarter::None, bounds, viewport, &state),
+            resting_button_slide(bounds)
+        );
+        assert_eq!(
+            button_slide_for_orientation(Quarter::Cw90, bounds, viewport, &state),
+            0.0
+        );
+        assert_eq!(
+            button_slide_for_orientation(Quarter::Ccw90, bounds, viewport, &state),
+            0.0
+        );
+    }
+
+    #[test]
+    fn sideways_button_slide_tracks_only_stage_two_expansion() {
+        let bounds = Rectangle {
+            x: 100.0,
+            y: 20.0,
+            width: 160.0,
+            height: 40.0,
+        };
+        let viewport = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 780.0,
+            height: 313.0,
+        };
+        let mut state = CarouselState {
+            label_widths: vec![64.0, 72.0, 72.0, 104.0, 88.0],
+            ..Default::default()
+        };
+
+        // Stage 1 only reveals the fade zones. Sibling controls stay put.
+        state.expand_t = 1.0;
+        assert_eq!(
+            button_slide_for_orientation(Quarter::Cw90, bounds, viewport, &state),
+            0.0
+        );
+
+        // Stage 2 moves them smoothly away from the growing carousel.
+        state.full_expand_t = 0.5;
+        let halfway = button_slide_for_orientation(Quarter::Cw90, bounds, viewport, &state);
+        state.full_expand_t = 1.0;
+        let expanded = button_slide_for_orientation(Quarter::Cw90, bounds, viewport, &state);
+
+        assert!(halfway < 0.0);
+        assert!((halfway * 2.0 - expanded).abs() < 0.001);
+        assert!(expanded < halfway);
+
+        // Collapse follows the same position curve in reverse; drag/snap does
+        // not add unrelated sibling motion beyond the stage-2 extent.
+        state.drag_offset = 80.0;
+        state.snap_from = -40.0;
+        assert_eq!(
+            button_slide_for_orientation(Quarter::Ccw90, bounds, viewport, &state,),
+            expanded
+        );
+        state.full_expand_t = 0.0;
+        assert_eq!(
+            button_slide_for_orientation(Quarter::Ccw90, bounds, viewport, &state,),
+            0.0
+        );
+    }
+
+    #[test]
+    fn landscape_button_clearance_uses_y_axis_not_side_strip_x() {
+        let portrait = Rectangle {
+            x: 640.0,
+            y: 80.0,
+            width: 160.0,
+            height: 40.0,
+        };
+        let left_strip = Rectangle {
+            x: 0.0,
+            y: 80.0,
+            width: 40.0,
+            height: 160.0,
+        };
+        let right_strip = Rectangle {
+            x: 740.0,
+            ..left_strip
+        };
+        let moved_down = Rectangle {
+            y: 120.0,
+            ..left_strip
+        };
+
+        let left = button_axis_bounds(Quarter::Cw90, left_strip, portrait);
+        let right = button_axis_bounds(Quarter::Cw90, right_strip, portrait);
+        let down = button_axis_bounds(Quarter::Cw90, moved_down, portrait);
+
+        assert_eq!(left.x, right.x);
+        assert_eq!(left.width, right.width);
+        assert_eq!(down.x - left.x, 40.0);
+    }
+
+    #[test]
+    fn ccw_remap_sends_strip_top_to_carousel_right() {
+        // A 200x40 carousel rotated CCW into a 40x200 strip: a tap near the
+        // strip's TOP maps to the carousel's RIGHT (end of the row). The block
+        // reads the other way round after the 180° flip.
+        let b = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 40.0,
+            height: 200.0,
+        };
+        let p = remap_pointer(Quarter::Ccw90, b, Point::new(20.0, 10.0));
+        // portrait width (long axis) is b.height = 200; end of row is near 200.
+        assert!(p.x > 180.0 && (p.y - 20.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn portrait_remap_is_identity() {
+        // Portrait must be byte-identical: the remap changes nothing.
+        let b = Rectangle {
+            x: 5.0,
+            y: 7.0,
+            width: 200.0,
+            height: 40.0,
+        };
+        let p = Point::new(42.0, 19.0);
+        assert_eq!(remap_pointer(Quarter::None, b, p), p);
+        assert_eq!(strip_point(Quarter::None, b, p), p);
+        let r = Rectangle {
+            x: 10.0,
+            y: 11.0,
+            width: 30.0,
+            height: 12.0,
+        };
+        assert_eq!(strip_rect(Quarter::None, b, r), r);
+    }
+
+    #[test]
+    fn remap_pointer_inverts_strip_point() {
+        // The hit-test remap must be the exact inverse of the draw transform,
+        // or taps land on the wrong label.
+        let b = Rectangle {
+            x: 12.0,
+            y: 8.0,
+            width: 40.0,
+            height: 200.0,
+        };
+        for quarter in [Quarter::Ccw90, Quarter::Cw90] {
+            // A point inside the portrait block (origin b, dims swapped).
+            let portrait = Point::new(b.x + 130.0, b.y + 25.0);
+            let strip = strip_point(quarter, b, portrait);
+            let back = remap_pointer(quarter, b, strip);
+            assert!((back.x - portrait.x).abs() < 0.001, "{quarter:?} x");
+            assert!((back.y - portrait.y).abs() < 0.001, "{quarter:?} y");
+        }
+    }
+
+    #[test]
+    fn cw_remap_sends_strip_top_to_carousel_left() {
+        // Cw90 mirrors Ccw90: a tap near the strip TOP maps to the carousel's
+        // LEFT (start of the row) after the 180° flip.
+        let b = Rectangle {
+            x: 0.0,
+            y: 0.0,
+            width: 40.0,
+            height: 200.0,
+        };
+        let p = remap_pointer(Quarter::Cw90, b, Point::new(20.0, 10.0));
+        assert!(p.x < 20.0 && (p.y - 20.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn content_long_uses_two_narrowest_for_three_plus_modes() {
+        // View, Photo, Video, Timelapse - the two narrowest (View + Photo) set
+        // the stable compact length, not the total of all four.
+        let widths = vec![64.0_f32, 72.0, 72.0, 104.0];
+        let long = content_long(&widths);
+        assert!((long - (64.0 + 72.0 + LABEL_GAP)).abs() < 0.001);
+        // ≤2 modes fall back to the full strip so both labels stay visible.
+        assert!((content_long(&[64.0, 72.0]) - (64.0 + 72.0 + LABEL_GAP)).abs() < 0.001);
+    }
+
+    #[test]
+    fn rotated_node_is_compact_content_not_full_lane() {
+        // Four modes → a compact ~138px content length down the strip.
+        let long = content_long(&[64.0_f32, 72.0, 72.0, 104.0]);
+
+        // A tall `Fill` group lane must NOT stretch the rotated node down the
+        // strip: the node equals the compact content, never the lane length.
+        let tall_lane = layout::Limits::new(Size::ZERO, Size::new(74.0, 2000.0));
+        for quarter in [Quarter::Cw90, Quarter::Ccw90] {
+            let sz = carousel_node_size(quarter, long, &tall_lane);
+            assert_eq!(
+                sz.width, CAROUSEL_HEIGHT,
+                "{quarter:?} thickness crosses strip"
+            );
+            assert!(
+                (sz.height - long).abs() < 0.001,
+                "{quarter:?} rotated node must equal compact content ({long}), got {}",
+                sz.height
+            );
+            assert!(
+                sz.height < 200.0,
+                "{quarter:?} must not inflate to the lane"
+            );
+        }
+
+        // A short lane still clamps so the node can never overflow the strip.
+        let short_lane = layout::Limits::new(Size::ZERO, Size::new(74.0, 100.0));
+        assert!(
+            (carousel_node_size(Quarter::Cw90, long, &short_lane).height - 100.0).abs() < 0.001
+        );
+
+        // Portrait is the axis-swap of the same rule: content on the width,
+        // fixed thickness on the height (byte-identical to before).
+        let wide_lane = layout::Limits::new(Size::ZERO, Size::new(2000.0, 74.0));
+        let p = carousel_node_size(Quarter::None, long, &wide_lane);
+        assert_eq!(p.height, CAROUSEL_HEIGHT);
+        assert!((p.width - long).abs() < 0.001);
+    }
+
+    #[test]
+    fn strip_rect_turns_the_block_axis_aligned() {
+        // The full block rectangle must remap onto the strip exactly.
+        let b = Rectangle {
+            x: 100.0,
+            y: 0.0,
+            width: 40.0,
+            height: 200.0,
+        };
+        let portrait = portrait_bounds(Quarter::Ccw90, b); // 200 wide, 40 tall
+        let mapped = strip_rect(Quarter::Ccw90, b, portrait);
+        assert!((mapped.x - b.x).abs() < 0.001);
+        assert!((mapped.y - b.y).abs() < 0.001);
+        assert!((mapped.width - b.width).abs() < 0.001);
+        assert!((mapped.height - b.height).abs() < 0.001);
     }
 }

@@ -25,6 +25,73 @@ impl AppModel {
             .unwrap_or_default()
     }
 
+    /// Compose sensor and display orientation for preview sampling. Mirroring
+    /// reverses the apparent direction of a quarter-turn, so front-camera
+    /// previews use the opposite display sign from unmirrored back cameras.
+    pub(crate) fn preview_adjusted_rotation(
+        &self,
+        sensor_rotation: crate::backends::camera::types::SensorRotation,
+        mirrored: bool,
+    ) -> crate::backends::camera::types::SensorRotation {
+        let display_degrees = self.display_orientation.degrees() as i32;
+        let combined_degrees = if mirrored {
+            sensor_rotation.degrees() as i32 + display_degrees
+        } else {
+            sensor_rotation.degrees() as i32 - display_degrees
+        };
+        crate::backends::camera::types::SensorRotation::from_degrees_int(combined_degrees)
+    }
+
+    pub(crate) fn preview_rotation(&self) -> crate::backends::camera::types::SensorRotation {
+        self.preview_adjusted_rotation(self.current_camera_rotation(), self.should_mirror_preview())
+    }
+
+    /// Rotation baked into media so it remains upright in the physical device
+    /// orientation in which capture started.
+    pub(crate) fn capture_media_rotation(&self) -> crate::backends::camera::types::SensorRotation {
+        let sensor_rotation = self.current_camera_rotation();
+        let display_degrees = self.display_orientation.degrees() as i32;
+        let is_back = self
+            .available_cameras
+            .get(self.current_camera_index)
+            .and_then(|camera| camera.camera_location.as_deref())
+            == Some("back");
+        let degrees = if is_back {
+            sensor_rotation.degrees() as i32 - display_degrees
+        } else {
+            sensor_rotation.degrees() as i32 + display_degrees
+        };
+        crate::backends::camera::types::SensorRotation::from_degrees_int(degrees)
+    }
+
+    /// The orientation used only to map on-screen capture geometry back into
+    /// sensor coordinates.
+    ///
+    /// This mirrors exactly how `preview_video_config` (in
+    /// `camera_preview/widget.rs`) composes the two rotations for the live
+    /// preview. Crop geometry must use the SAME combined value - not just
+    /// the sensor rotation - because `cover_capture_crop` inverse-maps an
+    /// on-screen rect (whose axes reflect the sensor rotated by the extra
+    /// display quarter-turn) through a Cover scale computed from the frame
+    /// dimensions this rotation swaps. Using the sensor-only rotation there
+    /// would swap dimensions inconsistently with what's on screen whenever
+    /// `display_orientation` is non-zero, producing a wrongly cropped and
+    /// wrongly cropped photo. This value must not be baked into saved media:
+    /// the compositor transform is transient presentation state, while saved
+    /// media uses only the camera's intrinsic sensor correction.
+    ///
+    /// At `Rotate0` (`display_orientation.degrees() == 0`) this is identical
+    /// to `current_camera_rotation()`, so portrait capture is unaffected.
+    ///
+    /// Centralising the composition here (rather than repeating it at each
+    /// capture call site) stops the sites from drifting out of sync, the
+    /// same way `AppModel::map_bar_insets` centralises the bar-edge mapping.
+    pub(crate) fn capture_geometry_rotation(
+        &self,
+    ) -> crate::backends::camera::types::SensorRotation {
+        self.preview_rotation()
+    }
+
     /// Cycle to the next or previous mode in the ordered mode list.
     pub(crate) fn handle_cycle_mode(&mut self, forward: bool) -> Task<cosmic::Action<Message>> {
         let modes = self.available_modes();
@@ -396,5 +463,73 @@ impl AppModel {
             }
         }
         Task::none()
+    }
+}
+
+#[cfg(test)]
+mod orientation_tests {
+    use super::*;
+    use crate::backends::camera::types::{CameraDevice, SensorRotation};
+    use crate::backends::display_orientation::DisplayOrientation;
+
+    fn landscape_model(sensor_rotation: SensorRotation, location: &str) -> AppModel {
+        AppModel {
+            available_cameras: vec![CameraDevice {
+                rotation: sensor_rotation,
+                camera_location: Some(location.to_string()),
+                ..CameraDevice::default()
+            }],
+            display_orientation: DisplayOrientation::Rotate270,
+            ..AppModel::default()
+        }
+    }
+
+    #[test]
+    fn landscape_preview_rotation_accounts_for_front_camera_mirroring() {
+        let mut front = landscape_model(SensorRotation::Rotate90, "front");
+        front.config.mirror_preview = true;
+        assert_eq!(front.preview_rotation(), SensorRotation::None);
+
+        let back = landscape_model(SensorRotation::Rotate270, "back");
+        assert_eq!(back.preview_rotation(), SensorRotation::None);
+    }
+
+    #[test]
+    fn landscape_capture_rotation_matches_the_physical_device_orientation() {
+        let front = landscape_model(SensorRotation::Rotate90, "front");
+        assert_eq!(front.capture_media_rotation(), SensorRotation::None);
+
+        let back = landscape_model(SensorRotation::Rotate270, "back");
+        assert_eq!(back.capture_media_rotation(), SensorRotation::None);
+    }
+
+    #[test]
+    fn portrait_keeps_each_cameras_sensor_correction() {
+        let mut front = landscape_model(SensorRotation::Rotate90, "front");
+        front.display_orientation = DisplayOrientation::Rotate0;
+        front.config.mirror_preview = true;
+        assert_eq!(front.preview_rotation(), SensorRotation::Rotate90);
+        assert_eq!(front.capture_geometry_rotation(), SensorRotation::Rotate90);
+        assert_eq!(front.capture_media_rotation(), SensorRotation::Rotate90);
+
+        let mut back = landscape_model(SensorRotation::Rotate270, "back");
+        back.display_orientation = DisplayOrientation::Rotate0;
+        assert_eq!(back.preview_rotation(), SensorRotation::Rotate270);
+        assert_eq!(back.capture_geometry_rotation(), SensorRotation::Rotate270);
+        assert_eq!(back.capture_media_rotation(), SensorRotation::Rotate270);
+    }
+
+    #[test]
+    fn opposite_landscape_direction_is_upright_for_front_and_back() {
+        let mut front = landscape_model(SensorRotation::Rotate90, "front");
+        front.display_orientation = DisplayOrientation::Rotate90;
+        front.config.mirror_preview = true;
+        assert_eq!(front.preview_rotation(), SensorRotation::Rotate180);
+        assert_eq!(front.capture_media_rotation(), SensorRotation::Rotate180);
+
+        let mut back = landscape_model(SensorRotation::Rotate270, "back");
+        back.display_orientation = DisplayOrientation::Rotate90;
+        assert_eq!(back.preview_rotation(), SensorRotation::Rotate180);
+        assert_eq!(back.capture_media_rotation(), SensorRotation::Rotate180);
     }
 }

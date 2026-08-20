@@ -76,11 +76,9 @@ pub struct VideoWidgetConfig {
     /// Blend between Contain (0.0) and Cover (1.0) for animated transitions.
     /// When `None`, uses `content_fit.blend()`.
     pub cover_blend: Option<f32>,
-    /// Top UI bar height in pixels — used to center the preview between bars in Contain mode.
-    pub bar_top_px: f32,
-    /// Bottom UI bar height in pixels — matches the actual UI footprint
-    /// (capture button + bottom bar + optional zoom row).
-    pub bar_bottom_px: f32,
+    /// Space the UI bars reserve on each edge, in logical px. Four-sided so the
+    /// blur letterboxes the correct edges when the device is held sideways.
+    pub insets: crate::app::preview_geometry::BarInsets,
     /// Theme background color (sRGB straight, RGBA). Used by the blur shader
     /// to fill the letterbox in Contain / Fit mode instead of returning
     /// transparent — otherwise the COSMIC window background leaks through.
@@ -100,8 +98,8 @@ pub struct VideoWidget {
     zoom_level: f32,
     /// Shader blend: 0.0 = Contain, 1.0 = Cover
     cover_blend: f32,
-    bar_top_px: f32,
-    bar_bottom_px: f32,
+    /// Four-sided control-bar reservation used by Contain/Fit geometry.
+    fit_insets: crate::app::preview_geometry::BarInsets,
 }
 
 impl VideoWidget {
@@ -200,8 +198,7 @@ impl VideoWidget {
             cover_blend: config
                 .cover_blend
                 .unwrap_or_else(|| config.content_fit.blend()),
-            bar_top_px: config.bar_top_px,
-            bar_bottom_px: config.bar_bottom_px,
+            fit_insets: config.insets,
         }
     }
 }
@@ -354,14 +351,13 @@ impl Widget<crate::app::Message, Theme, Renderer> for VideoWidget {
     ) {
         let bounds = layout.bounds();
 
-        // Update primitive with viewport size, cover blend, and bar heights (both px).
+        // Update primitive with viewport size, cover blend, and all bar insets.
         // The shader interpolates UV coordinates and centering based on the blend value.
         self.primitive.update_viewport(
             bounds.width,
             bounds.height,
             self.cover_blend,
-            self.bar_top_px,
-            self.bar_bottom_px,
+            self.fit_insets,
         );
 
         // Draw the custom primitive using the wgpu renderer's primitive support

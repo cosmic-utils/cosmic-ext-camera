@@ -6,7 +6,6 @@
 //! - V4L2 pan/tilt/zoom controls (for PTZ cameras)
 
 use crate::app::overlay_style::PICKER_PANEL;
-use crate::app::preview_geometry::TOP_BAR_HEIGHT;
 use crate::app::state::{AppModel, Message};
 use crate::backends::camera::v4l2_controls;
 use crate::fl;
@@ -83,34 +82,19 @@ impl AppModel {
         // Build picker panel with semi-transparent themed background. When
         // frosted glass is active, `frosted_panel` stacks a live-blurred preview
         // backdrop behind the translucent panel.
+        let picker_content = widget::scrollable(column).height(
+            crate::app::view::picker_panel_height(self.controls_are_sideways(), self.screen_height),
+        );
         let picker_panel = widget::mouse_area(
-            widget::container(self.frosted_panel(column.into(), PICKER_PANEL))
+            widget::container(self.frosted_panel(picker_content.into(), PICKER_PANEL))
                 .width(Length::Fixed(PICKER_PANEL_WIDTH)),
         )
         .on_press(Message::Noop);
 
-        // Position picker in top-right corner
-        let picker_positioned = widget::Row::new()
-            .push(
-                widget::Space::new()
-                    .width(Length::Fill)
-                    .height(Length::Shrink),
-            )
-            .push(picker_panel)
-            .padding([
-                TOP_BAR_HEIGHT as u16 + spacing.space_xs,
-                spacing.space_xs,
-                0,
-                spacing.space_xs,
-            ]);
-
-        widget::mouse_area(
-            widget::container(picker_positioned)
-                .width(Length::Fill)
-                .height(Length::Fill),
-        )
-        .on_press(Message::CloseMotorPicker)
-        .into()
+        // Anchor to the top bar's inner edge (below it in portrait, off the side
+        // bar in landscape), sharing the same bar-anchor helper as the tools menu
+        // and the other pickers.
+        self.anchor_bar_popup(picker_panel.into(), Message::CloseMotorPicker)
     }
 
     /// Get current V4L2 pan value

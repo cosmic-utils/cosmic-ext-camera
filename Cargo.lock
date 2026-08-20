@@ -993,6 +993,7 @@ dependencies = [
  "tracing-subscriber",
  "turbojpeg",
  "uuid",
+ "wayland-client",
  "zbus",
 ]
 

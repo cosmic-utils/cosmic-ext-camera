@@ -11,7 +11,7 @@ use cosmic::iced::advanced::layout;
 use cosmic::iced::advanced::renderer;
 use cosmic::iced::advanced::widget::tree::Tree;
 use cosmic::iced::advanced::{Clipboard, Layout, Shell, Widget};
-use cosmic::iced::{Event, Length, Rectangle, Size, Vector};
+use cosmic::iced::{Event, Length, Rectangle, Size, Vector, touch};
 use iced_core::mouse;
 
 use crate::app::state::Message;
@@ -25,6 +25,7 @@ pub struct SlideH<'a> {
     child: cosmic::Element<'a, Message>,
     slide_shared: Arc<AtomicU32>,
     sign: f32,
+    vertical: bool,
 }
 
 impl<'a> SlideH<'a> {
@@ -37,6 +38,20 @@ impl<'a> SlideH<'a> {
             child,
             slide_shared,
             sign,
+            vertical: false,
+        }
+    }
+
+    pub fn new_vertical(
+        child: cosmic::Element<'a, Message>,
+        slide_shared: Arc<AtomicU32>,
+        sign: f32,
+    ) -> Self {
+        Self {
+            child,
+            slide_shared,
+            sign,
+            vertical: true,
         }
     }
 
@@ -44,7 +59,18 @@ impl<'a> SlideH<'a> {
     fn expanded_viewport(&self, bounds: Rectangle) -> Rectangle {
         let offset = f32::from_bits(self.slide_shared.load(std::sync::atomic::Ordering::Relaxed))
             * self.sign;
-        if offset < 0.0 {
+        if self.vertical && offset < 0.0 {
+            Rectangle {
+                y: bounds.y + offset,
+                height: bounds.height - offset,
+                ..bounds
+            }
+        } else if self.vertical {
+            Rectangle {
+                height: bounds.height + offset,
+                ..bounds
+            }
+        } else if offset < 0.0 {
             Rectangle {
                 x: bounds.x + offset,
                 width: bounds.width - offset,
@@ -55,6 +81,43 @@ impl<'a> SlideH<'a> {
                 width: bounds.width + offset,
                 ..bounds
             }
+        }
+    }
+
+    fn translated_event(&self, event: &Event, offset: f32) -> Event {
+        let translate = |position: cosmic::iced::Point| {
+            if self.vertical {
+                cosmic::iced::Point::new(position.x, position.y - offset)
+            } else {
+                cosmic::iced::Point::new(position.x - offset, position.y)
+            }
+        };
+        match event {
+            Event::Touch(touch::Event::FingerPressed { id, position }) => {
+                Event::Touch(touch::Event::FingerPressed {
+                    id: *id,
+                    position: translate(*position),
+                })
+            }
+            Event::Touch(touch::Event::FingerMoved { id, position }) => {
+                Event::Touch(touch::Event::FingerMoved {
+                    id: *id,
+                    position: translate(*position),
+                })
+            }
+            Event::Touch(touch::Event::FingerLifted { id, position }) => {
+                Event::Touch(touch::Event::FingerLifted {
+                    id: *id,
+                    position: translate(*position),
+                })
+            }
+            Event::Touch(touch::Event::FingerLost { id, position }) => {
+                Event::Touch(touch::Event::FingerLost {
+                    id: *id,
+                    position: translate(*position),
+                })
+            }
+            _ => event.clone(),
         }
     }
 }
@@ -105,14 +168,23 @@ impl<'a> Widget<Message, Theme, Renderer> for SlideH<'a> {
         // Adjust cursor to match the visual translation so the child's
         // hover detection aligns with where the button is drawn.
         let adjusted_cursor = cursor.position().map_or(cursor, |pos| {
-            mouse::Cursor::Available(cosmic::iced::Point::new(pos.x - offset, pos.y))
+            mouse::Cursor::Available(if self.vertical {
+                cosmic::iced::Point::new(pos.x, pos.y - offset)
+            } else {
+                cosmic::iced::Point::new(pos.x - offset, pos.y)
+            })
         });
         // Use with_layer() to expand the clipping region to cover the
         // translated position. Parent containers clip viewport to their
         // bounds, so with_translation alone can't render outside them.
         let expanded = self.expanded_viewport(layout.bounds());
         renderer.with_layer(expanded, |renderer| {
-            renderer.with_translation(Vector::new(offset, 0.0), |renderer| {
+            let translation = if self.vertical {
+                Vector::new(0.0, offset)
+            } else {
+                Vector::new(offset, 0.0)
+            };
+            renderer.with_translation(translation, |renderer| {
                 self.child.as_widget().draw(
                     tree,
                     renderer,
@@ -142,12 +214,17 @@ impl<'a> Widget<Message, Theme, Renderer> for SlideH<'a> {
         let offset = f32::from_bits(self.slide_shared.load(std::sync::atomic::Ordering::Relaxed))
             * self.sign;
         let adjusted_cursor = cursor.position().map_or(cursor, |pos| {
-            mouse::Cursor::Available(cosmic::iced::Point::new(pos.x - offset, pos.y))
+            mouse::Cursor::Available(if self.vertical {
+                cosmic::iced::Point::new(pos.x, pos.y - offset)
+            } else {
+                cosmic::iced::Point::new(pos.x - offset, pos.y)
+            })
         });
         let expanded = self.expanded_viewport(layout.bounds());
+        let translated_event = self.translated_event(event, offset);
         self.child.as_widget_mut().update(
             tree,
-            event,
+            &translated_event,
             layout,
             adjusted_cursor,
             renderer,
@@ -162,17 +239,22 @@ impl<'a> Widget<Message, Theme, Renderer> for SlideH<'a> {
         tree: &Tree,
         layout: Layout<'_>,
         cursor: mouse::Cursor,
-        viewport: &Rectangle,
+        _viewport: &Rectangle,
         renderer: &Renderer,
     ) -> mouse::Interaction {
         let offset = f32::from_bits(self.slide_shared.load(std::sync::atomic::Ordering::Relaxed))
             * self.sign;
         let adjusted_cursor = cursor.position().map_or(cursor, |pos| {
-            mouse::Cursor::Available(cosmic::iced::Point::new(pos.x - offset, pos.y))
+            mouse::Cursor::Available(if self.vertical {
+                cosmic::iced::Point::new(pos.x, pos.y - offset)
+            } else {
+                cosmic::iced::Point::new(pos.x - offset, pos.y)
+            })
         });
+        let expanded = self.expanded_viewport(layout.bounds());
         self.child
             .as_widget()
-            .mouse_interaction(tree, layout, adjusted_cursor, viewport, renderer)
+            .mouse_interaction(tree, layout, adjusted_cursor, &expanded, renderer)
     }
 }
 

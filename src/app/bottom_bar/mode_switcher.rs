@@ -17,6 +17,11 @@ impl AppModel {
 
         let modes = self.available_modes();
 
+        // Quarter turn for the carousel content, derived from the display
+        // orientation. `Quarter::None` in portrait keeps the carousel exactly
+        // as it was; a quarter turn rotates its content along the side strip.
+        let quarter = self.controls_bar_layout().quarter;
+
         ModeCarousel::new(
             modes,
             self.mode,
@@ -27,6 +32,7 @@ impl AppModel {
             // switcher buttons next to it), so collapse the rounded chip
             // to the active "View" pill when fully settled.
             self.mode.is_view_only(),
+            quarter,
         )
         .into()
     }

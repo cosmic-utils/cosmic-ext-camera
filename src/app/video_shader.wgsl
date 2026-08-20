@@ -28,6 +28,10 @@ struct ViewportUniform {
     // The rect (x, y, w, h) the corners are cut from, in PHYSICAL px of the
     // render target, i.e. the same space as `@builtin(position)`.
     panel_rect: vec4<f32>,
+    noise: f32,
+    content_rect: vec4<f32>,
+    bar_left_width: f32,
+    bar_right_width: f32,
 }
 
 @group(0) @binding(2)
@@ -115,15 +119,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
         let effective_tex = tex_size * crop_range;
 
-        // Content area between UI bars (for contain centering)
+        // Content area between the effective UI edges (for contain centering)
+        let content_width = viewport.viewport_size.x - viewport.bar_left_width - viewport.bar_right_width;
         let content_height = viewport.viewport_size.y - viewport.bar_top_height - viewport.bar_bottom_height;
+        let content_center_x = (viewport.bar_left_width + content_width * 0.5) / viewport.viewport_size.x;
         let content_center_y = (viewport.bar_top_height + content_height * 0.5) / viewport.viewport_size.y;
 
         // Zoom levels using the blended effective texture dimensions
-        let contain_zoom = min(viewport.viewport_size.x / effective_tex.x, content_height / effective_tex.y);
+        let contain_zoom = min(content_width / effective_tex.x, content_height / effective_tex.y);
         let cover_zoom = max(viewport.viewport_size.x / effective_tex.x, viewport.viewport_size.y / effective_tex.y);
 
         let zoom = mix(contain_zoom, cover_zoom, blend);
+        let center_x = mix(content_center_x, 0.5, blend);
         let center_y = mix(content_center_y, 0.5, blend);
 
         var scale = vec2<f32>(
@@ -139,7 +146,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         // matches `tex_coords` (already rotated above). Without this, the asymmetric
         // `center_y` lands on the wrong axis for 90/270 rotations and is inverted for
         // 180 — Contain centering and aspect-ratio crops drift off-axis on the phone.
-        var pivot = vec2<f32>(0.5, center_y);
+        // `tex_coords` was mirrored around the window above. Mirror the pivot
+        // too, so the fitted image stays on its physical side of an asymmetric
+        // left/right content area while only its pixels are reflected.
+        let pivot_x = select(center_x, 1.0 - center_x, viewport.mirror_horizontal == 1u);
+        var pivot = vec2<f32>(pivot_x, center_y);
         if (viewport.rotation == 1u) {
             pivot = vec2<f32>(1.0 - pivot.y, pivot.x);
         } else if (viewport.rotation == 2u) {

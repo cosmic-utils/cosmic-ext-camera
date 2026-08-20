@@ -24,6 +24,11 @@ const FILTER_GRID_COLUMNS: usize = 3;
 const LABEL_SPACING: f32 = 4.0;
 
 impl AppModel {
+    fn filter_thumbnail_rotation(&self) -> u32 {
+        self.preview_adjusted_rotation(self.current_frame_rotation, self.should_mirror_preview())
+            .gpu_rotation_code()
+    }
+
     /// Build the filter picker as a COSMIC context drawer
     ///
     /// Shows a grid of filter options with live camera preview thumbnails
@@ -66,12 +71,8 @@ impl AppModel {
             let thumbnail: Element<'_, Message> = if let Some(frame) = &self.current_frame {
                 // Use video widget with the specific filter type
                 // The video widget fills its container and handles aspect ratio via Cover mode
-                // Get rotation from current camera
-                let rotation = self
-                    .available_cameras
-                    .get(self.current_camera_index)
-                    .map(|c| c.rotation.gpu_rotation_code())
-                    .unwrap_or(0);
+                // Match the live preview: sensor mounting plus display transform.
+                let rotation = self.filter_thumbnail_rotation();
 
                 // `Arc::clone` of the preview's own `current_frame`, and that is
                 // load-bearing: the pipeline maps VIDEO_ID_FILTER_PREVIEW onto
@@ -93,8 +94,7 @@ impl AppModel {
                         zoom_level: 1.0, // No zoom for filter previews
                         scroll_zoom_enabled: false, // No scroll zoom for filter previews
                         cover_blend: None,
-                        bar_top_px: 0.0,
-                        bar_bottom_px: 0.0,
+                        insets: crate::app::preview_geometry::BarInsets::default(),
                         // Filter previews don't use blur, so this is only here
                         // to satisfy the struct — value is ignored downstream.
                         letterbox_color: [0.0, 0.0, 0.0, 1.0],
@@ -221,5 +221,27 @@ impl AppModel {
             FilterType::ChromaticAberration => fl!("filter-chroma"),
             FilterType::Pencil => fl!("filter-pencil"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::backends::camera::types::SensorRotation;
+    use crate::backends::display_orientation::DisplayOrientation;
+
+    #[test]
+    fn filter_thumbnail_uses_the_live_preview_rotation() {
+        let mut model = AppModel {
+            display_orientation: DisplayOrientation::Rotate270,
+            current_frame_rotation: SensorRotation::Rotate270,
+            ..AppModel::default()
+        };
+
+        model.config.mirror_preview = false;
+        assert_eq!(model.filter_thumbnail_rotation(), 0);
+
+        model.config.mirror_preview = true;
+        assert_eq!(model.filter_thumbnail_rotation(), 2);
     }
 }

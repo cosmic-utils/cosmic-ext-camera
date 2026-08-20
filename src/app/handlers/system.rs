@@ -153,6 +153,26 @@ impl AppModel {
         Task::none()
     }
 
+    pub(crate) fn handle_set_controls_position(
+        &mut self,
+        index: usize,
+    ) -> Task<cosmic::Action<Message>> {
+        let Some(&position) = crate::config::ControlsPosition::ALL.get(index) else {
+            return Task::none();
+        };
+
+        info!(?position, "Setting controls panel position");
+        self.config.controls_position = position;
+
+        if let Some(handler) = self.config_handler.as_ref()
+            && let Err(err) = self.config.write_entry(handler)
+        {
+            error!(?err, "Failed to save controls panel position");
+        }
+
+        Task::none()
+    }
+
     pub(crate) fn handle_select_default_mode(
         &mut self,
         index: usize,
