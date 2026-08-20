@@ -322,3 +322,7 @@ metainfo-feature-controls = 手动控制：曝光、ISO、快门、聚焦和白�
 metainfo-feature-filters = 14 种创意滤镜：{ filter-mono }、{ filter-sepia }、{ filter-vivid }、{ filter-noir }、{ filter-pencil }等
 settings-overlay-effect-description = 控制器如何叠加在预览上。磨砂玻璃会模糊其后的预览，但会使用更多 GPU 资源。
 settings-mirror-captures-description = 对保存的照片、视频和延时摄影应用相同的水平反转效应
+controls-position-bottom = 底部
+controls-position-left = 左边
+controls-position-right = 右边
+settings-controls-position = 控制位置
