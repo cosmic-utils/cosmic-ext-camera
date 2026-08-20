@@ -75,13 +75,14 @@ to do. Only en gets the full appearance matrix above.
 - &lrm;[**Kamera** (`de`)](locales/de/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Cámara** (`es`)](locales/es/README.md) &mdash; 6 shots, 0/6 captions translated
 - &lrm;[**Kaamera** (`et`)](locales/et/README.md) &mdash; 6 shots, 0/6 captions translated
-- &lrm;[**Kamera** (`fi`)](locales/fi/README.md) &mdash; 6 shots, 0/6 captions translated
+- &lrm;[**Kamera** (`fi`)](locales/fi/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Caméra** (`fr`)](locales/fr/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Kamera** (`hu`)](locales/hu/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Wênekêş** (`kmr`)](locales/kmr/README.md) &mdash; 6 shots, 0/6 captions translated
 - &lrm;[**Aparat** (`pl`)](locales/pl/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Câmera** (`pt-BR`)](locales/pt-BR/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Kamera** (`sv`)](locales/sv/README.md) &mdash; 6 shots, 6/6 captions translated
+- &lrm;[**Kamera** (`tr`)](locales/tr/README.md) &mdash; 6 shots, 0/6 captions translated
 - &lrm;[**Камера** (`uk`)](locales/uk/README.md) &mdash; 6 shots, 4/6 captions translated
 - &lrm;[**相机** (`zh-CN`)](locales/zh-CN/README.md) &mdash; 6 shots, 6/6 captions translated
 
