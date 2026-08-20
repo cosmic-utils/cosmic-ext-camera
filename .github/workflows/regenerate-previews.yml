@@ -156,16 +156,32 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          branch=ci/regenerate-previews
+
           # Scope the commit to preview/ (PNGs + generated galleries). Metadata
           # under resources/ is owned by the "Regenerate Derived Files" job.
           git add preview
 
           if git diff --cached --quiet; then
-            echo "Previews already up to date; no pull request needed."
+            pr_number="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+            if [ -n "$pr_number" ]; then
+              gh pr close "$pr_number" --comment \
+                "Closing automatically because the latest regeneration from main produced no screenshot changes. This generated pull request is obsolete."
+              echo "Closed stale pull request #$pr_number."
+            fi
+
+            remote_branch="$(git ls-remote --heads origin "refs/heads/$branch")"
+            if [ -n "$remote_branch" ]; then
+              git push origin --delete "$branch"
+              echo "Deleted stale remote branch $branch."
+            fi
+
+            if [ -z "$pr_number" ] && [ -z "$remote_branch" ]; then
+              echo "Previews already up to date; no pull request needed."
+            fi
             exit 0
           fi
 
-          branch=ci/regenerate-previews
           git switch -C "$branch"
           git commit -m "chore: regenerate preview screenshots"
 
@@ -174,9 +190,9 @@ jobs:
           git lfs push origin "$branch"
           git push --force origin "$branch"
 
-          state="$(gh pr view "$branch" --json state --jq .state 2>/dev/null || echo NONE)"
-          if [ "$state" = "OPEN" ]; then
-            echo "Pull request already open for $branch; its branch was updated."
+          pr_number="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$pr_number" ]; then
+            echo "Pull request #$pr_number already open for $branch; its branch was updated."
             exit 0
           fi
 
