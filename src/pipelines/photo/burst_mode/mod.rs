@@ -1181,7 +1181,9 @@ impl BurstModeGpuPipeline {
 
         // Pack RGBA u8 into u32 for GPU (the shader expects this format)
         let packed_data: Vec<u32> = data
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|chunk| {
                 u32::from(chunk[0])
                     | (u32::from(chunk[1]) << 8)
@@ -2559,7 +2561,9 @@ impl BurstModeGpuPipeline {
         // the sharpness shader (which expects RGBA f32 input)
         let gray_rgba: Vec<f32> = planes
             .data
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|rgba| {
                 let gray = (rgba[0] + rgba[1] + rgba[2] + rgba[3]) * 0.25;
                 [gray, gray, gray, 1.0]
