@@ -232,6 +232,10 @@ impl AppModel {
         &mut self,
         frame: Arc<crate::backends::camera::types::CameraFrame>,
     ) -> Task<cosmic::Action<Message>> {
+        static FIRST_FRAME: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
+        crate::startup::milestone_once("first_frame_updated_in_ui", &FIRST_FRAME);
+
         static FRAME_MSG_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let count = FRAME_MSG_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if count.is_multiple_of(30) {
@@ -287,6 +291,18 @@ impl AppModel {
         // Track whether this frame is from a file source (for mirror handling)
         let is_file_source = self.virtual_camera.is_file_source();
 
+        // V4L2 control discovery opens the same device that libcamera is about
+        // to start. Defer it until the preview has produced a frame so it cannot
+        // contend with camera startup. Store placeholders immediately to ensure
+        // only the first frame schedules the asynchronous query.
+        let exposure_task = if !is_file_source && self.exposure_settings.is_none() {
+            self.exposure_settings = Some(Default::default());
+            self.color_settings = Some(Default::default());
+            self.query_exposure_controls_task()
+        } else {
+            Task::none()
+        };
+
         // Get rotation from current camera (None for file sources)
         let frame_rotation = if is_file_source {
             crate::backends::camera::types::SensorRotation::None
@@ -306,7 +322,7 @@ impl AppModel {
             self.current_frame = Some(Arc::clone(&frame));
             self.current_frame_is_file_source = is_file_source;
             self.current_frame_rotation = frame_rotation;
-            return task.map(cosmic::Action::App);
+            return Task::batch([task.map(cosmic::Action::App), exposure_task]);
         }
 
         // During HDR+ processing, the camera stream is stopped.
@@ -337,7 +353,7 @@ impl AppModel {
         self.current_frame = Some(frame);
         self.current_frame_is_file_source = is_file_source;
         self.current_frame_rotation = frame_rotation;
-        Task::none()
+        exposure_task
     }
 
     pub(crate) fn handle_cameras_initialized(
@@ -346,6 +362,7 @@ impl AppModel {
         camera_index: usize,
         formats: Vec<crate::backends::camera::types::CameraFormat>,
     ) -> Task<cosmic::Action<Message>> {
+        crate::startup::milestone("cameras_initialized_in_ui");
         info!(
             count = cameras.len(),
             camera_index, "Cameras initialized asynchronously"
@@ -376,35 +393,6 @@ impl AppModel {
         self.update_idle_inhibit();
 
         let mut tasks: Vec<Task<cosmic::Action<Message>>> = Vec::new();
-
-        // Query exposure controls for the current camera
-        if let Some(device_path) = self.get_v4l2_device_path() {
-            let path = device_path.clone();
-            let focus_path = self.get_focus_device_path();
-            tasks.push(Task::perform(
-                async move {
-                    let controls = crate::app::exposure_picker::query_exposure_controls(
-                        &path,
-                        focus_path.as_deref(),
-                    );
-                    let settings = crate::app::exposure_picker::get_exposure_settings(
-                        &path,
-                        &controls,
-                        focus_path.as_deref(),
-                    );
-                    let color_settings =
-                        crate::app::exposure_picker::get_color_settings(&path, &controls);
-                    (controls, settings, color_settings)
-                },
-                |(controls, settings, color_settings)| {
-                    cosmic::Action::App(Message::ExposureControlsQueried(
-                        Box::new(controls),
-                        settings,
-                        color_settings,
-                    ))
-                },
-            ));
-        }
 
         // Probe video encoders in the background. Builds a short videotestsrc
         // pipeline per encoder to detect broken ones (e.g. V4L2 encoders that

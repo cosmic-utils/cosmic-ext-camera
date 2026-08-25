@@ -2218,6 +2218,10 @@ impl VideoPipeline {
             return;
         }
 
+        static FIRST_PREVIEW_UPLOAD: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
+        crate::startup::milestone_once("first_preview_gpu_upload", &FIRST_PREVIEW_UPLOAD);
+
         // The entry this frame's pixels live in — which is not `frame.id`, since
         // the frosted backdrop draws the preview's own frame (see
         // `source_texture_id`).

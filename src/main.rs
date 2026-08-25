@@ -128,6 +128,7 @@ enum ProcessMode {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    camera::startup::start();
     let cli = Cli::parse();
 
     let is_terminal_mode = matches!(cli.command, Some(Commands::Terminal));
@@ -155,6 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     tracing::info!("camera app starting");
+    camera::startup::milestone("logging_ready");
 
     match cli.command {
         Some(Commands::Terminal) => camera::terminal::run(),
@@ -184,6 +186,8 @@ fn run_gui(
     preview_spoof_recording: bool,
     preview_fake_camera: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    camera::startup::milestone("gui_start");
+
     // Start pre-warming on background threads BEFORE the iced event loop.
     // This overlaps GStreamer init, device enumeration, and camera discovery
     // with Wayland/wgpu setup (~280ms of framework time we'd otherwise waste).
@@ -216,6 +220,7 @@ fn run_gui(
             count = formats.len(),
             "prewarm: formats for default camera ready"
         );
+        camera::startup::milestone("camera_enumeration_ready");
         (cameras, formats)
     });
     let prewarm_handle = std::thread::spawn(move || {
@@ -273,6 +278,7 @@ fn run_gui(
     };
 
     // Starts the application's event loop with flags
+    camera::startup::milestone("event_loop_start");
     cosmic::app::run::<AppModel>(settings, flags)?;
 
     Ok(())

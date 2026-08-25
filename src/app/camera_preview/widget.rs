@@ -5,7 +5,6 @@
 use crate::app::state::{AppModel, Message};
 use crate::app::video_widget::{self, VideoContentFit};
 use crate::backends::camera::types::SensorRotation;
-use crate::fl;
 use cosmic::Element;
 use cosmic::iced::Length;
 use cosmic::widget;
@@ -28,6 +27,20 @@ pub struct FrozenPreviewTransforms {
 }
 
 impl AppModel {
+    pub(crate) fn is_waiting_for_preview_frame(&self) -> bool {
+        self.current_frame.is_none()
+    }
+
+    fn preview_loading_indicator(&self) -> Element<'_, Message> {
+        widget::container(widget::progress_bar::indeterminate_circular())
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_x(cosmic::iced::alignment::Horizontal::Center)
+            .align_y(cosmic::iced::alignment::Vertical::Center)
+            .style(crate::app::overlay_style::window_bg_style)
+            .into()
+    }
+
     /// Whether the preview should be mirrored (front cameras only, not file sources)
     pub(crate) fn should_mirror_preview(&self) -> bool {
         let is_back = self
@@ -163,27 +176,11 @@ impl AppModel {
     /// Build the camera preview widget
     ///
     /// Uses custom video widget with handle caching for optimized rendering.
-    /// Shows a loading indicator when cameras are initializing.
-    /// Shows a black placeholder when no camera frame is available.
+    /// Shows a centered loading spinner until the first frame is available.
     /// Shows a blurred last frame during camera transitions.
     pub fn build_camera_preview(&self) -> Element<'_, Message> {
-        // Show loading indicator if cameras aren't initialized yet
-        if self.available_cameras.is_empty() {
-            return widget::container(
-                widget::Column::new()
-                    .push(widget::text(fl!("initializing-camera")).size(20))
-                    .spacing(10)
-                    .align_x(cosmic::iced::alignment::Horizontal::Center),
-            )
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .align_x(cosmic::iced::alignment::Horizontal::Center)
-            .align_y(cosmic::iced::alignment::Vertical::Center)
-            .style(|theme| widget::container::Style {
-                text_color: Some(theme.cosmic().on_bg_color().into()),
-                ..crate::app::overlay_style::window_bg_style(theme)
-            })
-            .into();
+        if self.is_waiting_for_preview_frame() {
+            return self.preview_loading_indicator();
         }
 
         // Build the main video preview (either current frame or placeholder)
@@ -242,16 +239,7 @@ impl AppModel {
             info!(render_count = count, "No frame available in view");
         }
 
-        // Themed canvas placeholder when no camera frame
-        widget::container(
-            widget::Space::new()
-                .width(Length::Fill)
-                .height(Length::Fill),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .style(crate::app::overlay_style::window_bg_style)
-        .into()
+        self.preview_loading_indicator()
     }
 }
 
@@ -262,6 +250,12 @@ mod tests {
     use crate::app::video_primitive::{VIDEO_ID_BLUR, VIDEO_ID_FROSTED, VIDEO_ID_NORMAL};
     use crate::app::video_widget::VideoWidgetConfig;
     use crate::backends::display_orientation::DisplayOrientation;
+
+    #[test]
+    fn preview_spinner_is_shown_until_the_first_frame() {
+        assert!(AppModel::default().is_waiting_for_preview_frame());
+        assert!(!model().is_waiting_for_preview_frame());
+    }
 
     #[test]
     fn preview_adjusted_rotation_keeps_derived_previews_upright() {
