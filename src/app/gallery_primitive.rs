@@ -525,7 +525,7 @@ mod tests {
     /// the step that validates the shader.
     #[test]
     fn gallery_pipeline_compiles_its_shader() {
-        let Some((device, _queue)) = headless_device() else {
+        let Some((_gpu_test, device, _queue)) = headless_device() else {
             skip_no_gpu("gallery_pipeline_compiles_its_shader");
             return;
         };
