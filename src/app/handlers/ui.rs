@@ -61,6 +61,12 @@ impl AppModel {
     // UI Navigation Handlers
     // =========================================================================
 
+    fn dismiss_keybind_recording_if_inactive(&mut self) {
+        if self.context_page != ContextPage::KeyBindings || !self.core.window.show_context {
+            self.recording_keybind = None;
+        }
+    }
+
     pub(crate) fn handle_launch_url(&self, url: String) -> Task<cosmic::Action<Message>> {
         match open::that_detached(&url) {
             Ok(()) => {}
@@ -88,6 +94,7 @@ impl AppModel {
         if context_page == ContextPage::Settings && self.core.window.show_context {
             self.settings_page = SettingsPage::Root;
         }
+        self.dismiss_keybind_recording_if_inactive();
         self.sync_audio_probe();
         // Reset the shared drawer scrollable so the new page starts at the top.
         if self.core.window.show_context {
@@ -136,6 +143,7 @@ impl AppModel {
             self.close_all_pickers();
             if self.core.window.show_context {
                 self.core.window.show_context = false;
+                self.dismiss_keybind_recording_if_inactive();
                 self.sync_audio_probe();
             }
         }
@@ -192,7 +200,67 @@ impl AppModel {
         self.context_page = ContextPage::Settings;
         self.core.window.show_context = true;
         self.settings_page = page;
+        self.dismiss_keybind_recording_if_inactive();
         self.sync_audio_probe();
         reset_context_drawer_scroll()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::keybind::Action;
+    use crate::app::state::RecordingKeyBindState;
+
+    fn recording_state() -> RecordingKeyBindState {
+        RecordingKeyBindState {
+            action: Action::Capture,
+            captured: None,
+            conflict_with: None,
+        }
+    }
+
+    #[test]
+    fn back_to_settings_dismisses_keybind_recording() {
+        let _ = gstreamer::init();
+        let mut app = AppModel {
+            context_page: ContextPage::KeyBindings,
+            recording_keybind: Some(recording_state()),
+            ..AppModel::default()
+        };
+
+        drop(app.handle_open_settings_page(SettingsPage::Root));
+
+        assert!(app.recording_keybind.is_none());
+    }
+
+    #[test]
+    fn closing_keybindings_drawer_dismisses_recording() {
+        let _ = gstreamer::init();
+        let mut app = AppModel {
+            context_page: ContextPage::KeyBindings,
+            recording_keybind: Some(recording_state()),
+            ..AppModel::default()
+        };
+        app.core.window.show_context = true;
+
+        drop(app.handle_toggle_context_page(ContextPage::KeyBindings));
+
+        assert!(app.recording_keybind.is_none());
+    }
+
+    #[test]
+    fn hiding_ui_dismisses_keybind_recording() {
+        let _ = gstreamer::init();
+        let mut app = AppModel {
+            context_page: ContextPage::KeyBindings,
+            recording_keybind: Some(recording_state()),
+            ..AppModel::default()
+        };
+        app.core.window.show_context = true;
+
+        drop(app.handle_toggle_ui_chrome());
+
+        assert!(app.recording_keybind.is_none());
     }
 }
