@@ -331,7 +331,7 @@ impl cosmic::Application for AppModel {
         let prewarm = flags.prewarm.and_then(|h| h.join().ok());
         crate::startup::milestone("prewarm_joined");
 
-        let (available_audio_devices, available_video_encoders, camera_enum_handle) =
+        let (available_audio_devices, available_video_encoders, mut camera_enum_handle) =
             if let Some(pw) = prewarm {
                 // GStreamer was already initialized by the prewarm thread, but call again
                 // to ensure the main thread's state is consistent (gst::init is idempotent)
@@ -628,6 +628,41 @@ impl cosmic::Application for AppModel {
         // Always hide headerbar — custom window controls are in the top bar overlay
         app.core.window.show_headerbar = false;
 
+        // Warm launches often finish camera enumeration before AppModel construction.
+        // Install those results immediately so capture can start on the first loop.
+        let last_camera_path = app.config.last_camera_path.clone();
+        let failed_camera_paths = app.config.failed_camera_paths.clone();
+        let (cameras_ready_at_init, early_camera_followup_task) = if !preview_fake_camera
+            && camera_enum_handle
+                .as_ref()
+                .is_some_and(std::thread::JoinHandle::is_finished)
+        {
+            let handle = camera_enum_handle
+                .take()
+                .expect("camera enumeration handle");
+            let (cameras, default_formats) =
+                handle.join().unwrap_or_else(|_| (Vec::new(), Vec::new()));
+            let camera_index = pick_startup_camera_index(
+                &cameras,
+                last_camera_path.as_deref(),
+                &failed_camera_paths,
+            );
+            let formats = if camera_index == 0 {
+                default_formats
+            } else {
+                let backend = crate::backends::camera::create_backend();
+                cameras
+                    .get(camera_index)
+                    .filter(|camera| !camera.path.is_empty())
+                    .map(|camera| backend.get_formats(camera, false))
+                    .unwrap_or_default()
+            };
+            let task = app.handle_cameras_initialized(cameras, camera_index, formats);
+            (true, task)
+        } else {
+            (false, Task::none())
+        };
+
         // Update all dropdown options based on initial format
         app.update_mode_options();
         app.update_resolution_options();
@@ -658,9 +693,6 @@ impl cosmic::Application for AppModel {
         // Initialize cameras — camera enum thread was started before the event loop
         // so it overlaps with framework Vulkan init (~280ms). We wrap the join in an
         // async Task so it doesn't block init() or the first render.
-        let last_camera_path = app.config.last_camera_path.clone();
-        let failed_camera_paths = app.config.failed_camera_paths.clone();
-
         let init_task = if preview_fake_camera {
             // Preview harness (`--preview-fake-camera`): skip real enumeration and
             // present synthetic devices so the full camera UI renders. Frames come
@@ -672,6 +704,8 @@ impl cosmic::Application for AppModel {
             Task::done(cosmic::Action::App(Message::CamerasInitialized(
                 cameras, 0, formats,
             )))
+        } else if cameras_ready_at_init {
+            Task::none()
         } else if let Some(handle) = camera_enum_handle {
             let failed_paths = failed_camera_paths.clone();
             Task::perform(
@@ -824,6 +858,7 @@ impl cosmic::Application for AppModel {
             app,
             Task::batch([
                 init_task,
+                early_camera_followup_task,
                 encoder_log_task,
                 load_thumbnail_task,
                 preview_source_task,
