@@ -372,6 +372,8 @@ fn capture_thread_setup_and_run(
 ) -> Result<(), BackendError> {
     use libcamera::camera_manager::CameraManager;
 
+    crate::startup::milestone("capture_thread_setup_start");
+
     // Wait for any previous CameraManager to be fully dropped.
     // libcamera enforces a singleton — creating a second instance is fatal.
     // The old capture thread signals CAPTURE_RELEASED after dropping its manager.
@@ -434,6 +436,7 @@ fn capture_thread_setup_and_run(
         CameraManager::new()
             .map_err(|e| BackendError::InitializationFailed(format!("CameraManager::new: {}", e)))?
     };
+    crate::startup::milestone("capture_camera_manager_ready");
 
     info!(version = mgr.version(), "libcamera version");
 
@@ -490,6 +493,7 @@ fn capture_thread_setup_and_run(
     active_cam
         .start(None)
         .map_err(|e| BackendError::InitializationFailed(format!("Camera start: {}", e)))?;
+    crate::startup::milestone("camera_hardware_started");
 
     // Queue all requests
     for req in requests {
@@ -1036,6 +1040,9 @@ fn dispatch_viewfinder_frame(
     is_multistream: bool,
     skip_recording: bool,
 ) {
+    static FIRST_FRAME: AtomicBool = AtomicBool::new(false);
+    crate::startup::milestone_once("first_frame_captured", &FIRST_FRAME);
+
     // Store latest preview frame
     if let Ok(mut latest) = params.latest_preview.lock() {
         *latest = Some(frame.clone());

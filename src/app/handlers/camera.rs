@@ -232,6 +232,10 @@ impl AppModel {
         &mut self,
         frame: Arc<crate::backends::camera::types::CameraFrame>,
     ) -> Task<cosmic::Action<Message>> {
+        static FIRST_FRAME: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
+        crate::startup::milestone_once("first_frame_updated_in_ui", &FIRST_FRAME);
+
         static FRAME_MSG_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let count = FRAME_MSG_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if count.is_multiple_of(30) {
@@ -346,6 +350,7 @@ impl AppModel {
         camera_index: usize,
         formats: Vec<crate::backends::camera::types::CameraFormat>,
     ) -> Task<cosmic::Action<Message>> {
+        crate::startup::milestone("cameras_initialized_in_ui");
         info!(
             count = cameras.len(),
             camera_index, "Cameras initialized asynchronously"

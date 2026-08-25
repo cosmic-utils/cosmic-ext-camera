@@ -36,6 +36,7 @@ pub mod media;
 pub mod network_manager;
 pub mod pipelines;
 pub mod shaders;
+pub mod startup;
 pub mod storage;
 pub mod terminal;
 #[cfg(test)]
