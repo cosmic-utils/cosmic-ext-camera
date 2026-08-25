@@ -61,7 +61,7 @@ use crate::fl;
 use cosmic::cosmic_config::{self, CosmicConfigEntry};
 use cosmic::iced::Subscription;
 use cosmic::widget::{self, about::About};
-use cosmic::{Element, Task};
+use cosmic::{ApplicationExt, Element, Task};
 use iced_futures::subscription;
 pub use state::{
     AppFlags, AppModel, BurstModeStage, BurstModeState, CameraMode, ContextPage, FileSource,
@@ -218,6 +218,20 @@ const REPOSITORY: &str = "https://github.com/cosmic-utils/cosmic-ext-camera";
 /// App icon for the about page (pre-rendered PNG avoids SVG parsing lag on first open)
 const APP_ICON: &[u8] =
     include_bytes!("../../resources/icons/hicolor/256x256/apps/io.github.cosmic_utils.camera.png");
+
+fn app_title() -> String {
+    fl!("camera")
+}
+
+impl AppModel {
+    fn update_title(&mut self) -> Task<cosmic::Action<Message>> {
+        if let Some(window_id) = self.core.main_window_id() {
+            self.set_window_title(app_title(), window_id)
+        } else {
+            Task::none()
+        }
+    }
+}
 
 impl cosmic::Application for AppModel {
     /// The async executor that will be used to run your application's commands.
@@ -854,9 +868,12 @@ impl cosmic::Application for AppModel {
         );
         crate::startup::milestone("app_init_complete");
 
+        let title_task = app.update_title();
+
         (
             app,
             Task::batch([
+                title_task,
                 init_task,
                 early_camera_followup_task,
                 encoder_log_task,
@@ -1817,5 +1834,15 @@ impl cosmic::Application for AppModel {
     /// Handles messages emitted by the application and its widgets.
     fn update(&mut self, message: Self::Message) -> Task<cosmic::Action<Self::Message>> {
         self.update(message)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn window_title_uses_localized_app_name() {
+        assert_eq!(app_title(), fl!("camera"));
     }
 }
