@@ -68,7 +68,7 @@ filter-noir = Noir
 # Boosted colour and contrast.
 filter-vivid = Vivid
 # Shifted towards blue.
-filter-cool = Cold
+filter-cold = Cold
 # Shifted towards orange.
 filter-warm = Warm
 # Washed out, reduced contrast.
