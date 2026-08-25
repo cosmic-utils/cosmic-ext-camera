@@ -292,7 +292,7 @@ impl GalleryPipeline {
         ) {
             // Convert RGBA -> BGRA by swapping R and B channels
             let mut bgra_data = rgba_data.to_vec();
-            for chunk in bgra_data.chunks_exact_mut(4) {
+            for chunk in bgra_data.as_chunks_mut::<4>().0 {
                 chunk.swap(0, 2); // Swap R and B
             }
             bgra_data
