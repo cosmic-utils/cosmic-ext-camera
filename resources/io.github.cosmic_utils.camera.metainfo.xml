@@ -379,6 +379,17 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.3.2" date="2026-08-25">
+      <description>
+        <p>Release 1.3.2 includes the following changes:</p>
+        <ul>
+          <li>fix(tests): remove flaky GPU lock test</li>
+          <li>fix: dismiss keybind recording on navigation</li>
+          <li>perf(startup): quicker visual completeness</li>
+          <li>fix: set window title</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.1" date="2026-08-25">
       <description>
         <p>Release 1.3.1 includes the following changes:</p>
