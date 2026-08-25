@@ -49,10 +49,11 @@ RUN dpkg --add-architecture riscv64 && \
     libseat-dev:riscv64 \
     && rm -rf /var/lib/apt/lists/*
 
-# Build and install libcamera 0.7.0 for riscv64 cross-compilation
+# Build and install libcamera 0.7.2 for riscv64 cross-compilation
 # Ubuntu 24.04 only has libcamera 0.2.0, so we build from source
-RUN git clone --depth 1 --branch v0.7.0 https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera && \
+RUN git clone --depth 1 --branch v0.7.2 https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera && \
     cd /tmp/libcamera && \
+    test "$(git rev-parse HEAD)" = 191e202178f02430b5942397c70d215cdd2056fa && \
     printf '[binaries]\nc = '"'"'riscv64-linux-gnu-gcc'"'"'\ncpp = '"'"'riscv64-linux-gnu-g++'"'"'\nar = '"'"'riscv64-linux-gnu-ar'"'"'\nstrip = '"'"'riscv64-linux-gnu-strip'"'"'\npkgconfig = '"'"'pkg-config'"'"'\n\n[host_machine]\nsystem = '"'"'linux'"'"'\ncpu_family = '"'"'riscv64'"'"'\ncpu = '"'"'riscv64'"'"'\nendian = '"'"'little'"'"'\n\n[properties]\nsys_root = '"'"'/'"'"'\npkg_config_libdir = ['"'"'/usr/lib/riscv64-linux-gnu/pkgconfig'"'"', '"'"'/usr/share/pkgconfig'"'"']\n' > /tmp/riscv64-cross.txt && \
     meson setup build --prefix=/usr --cross-file /tmp/riscv64-cross.txt \
         -Dpipelines=uvcvideo,simple -Dipas=simple \

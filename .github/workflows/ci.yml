@@ -104,12 +104,13 @@ jobs:
             libyaml-dev
 
       # Built from source: ubuntu-latest (currently Ubuntu 24.04) ships only
-      # libcamera 0.2.0 in apt. When the runner moves to Ubuntu 26.04 or later
-      # (which packages 0.7.0), drop this step and install libcamera-dev from apt.
-      - name: Build and install libcamera 0.7.0
+      # libcamera 0.2.0 in apt. Keep this pinned to the same release and commit as
+      # the Flatpak manifest until the runner packages libcamera 0.7.2 or newer.
+      - name: Build and install libcamera 0.7.2
         run: |
-          git clone --depth 1 --branch v0.7.0 https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera
+          git clone --depth 1 --branch v0.7.2 https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera
           cd /tmp/libcamera
+          test "$(git rev-parse HEAD)" = 191e202178f02430b5942397c70d215cdd2056fa
           meson setup build -Dprefix=/usr -Dpipelines=uvcvideo,simple -Dipas=simple -Dgstreamer=disabled -Dtest=false -Dcam=disabled -Dqcam=disabled -Dlc-compliance=disabled -Dtracing=disabled -Ddocumentation=disabled -Dpycamera=disabled
           ninja -C build
           sudo ninja -C build install
@@ -209,13 +210,14 @@ jobs:
             libyaml-dev
 
       # Built from source: ubuntu-latest (currently Ubuntu 24.04) ships only
-      # libcamera 0.2.0 in apt. When the runner moves to Ubuntu 26.04 or later
-      # (which packages 0.7.0), drop this step and install libcamera-dev from apt.
-      - name: Build and install libcamera 0.7.0 (native build)
+      # libcamera 0.2.0 in apt. Keep this pinned to the same release and commit as
+      # the Flatpak manifest until the runner packages libcamera 0.7.2 or newer.
+      - name: Build and install libcamera 0.7.2 (native build)
         if: ${{ !matrix.use_cross }}
         run: |
-          git clone --depth 1 --branch v0.7.0 https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera
+          git clone --depth 1 --branch v0.7.2 https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera
           cd /tmp/libcamera
+          test "$(git rev-parse HEAD)" = 191e202178f02430b5942397c70d215cdd2056fa
           meson setup build -Dprefix=/usr -Dpipelines=uvcvideo,simple -Dipas=simple -Dgstreamer=disabled -Dtest=false -Dcam=disabled -Dqcam=disabled -Dlc-compliance=disabled -Dtracing=disabled -Ddocumentation=disabled -Dpycamera=disabled
           ninja -C build
           sudo ninja -C build install
