@@ -210,7 +210,7 @@ impl AppModel {
             FilterType::Sepia => fl!("filter-sepia"),
             FilterType::Noir => fl!("filter-noir"),
             FilterType::Vivid => fl!("filter-vivid"),
-            FilterType::Cool => fl!("filter-cool"),
+            FilterType::Cool => fl!("filter-cold"),
             FilterType::Warm => fl!("filter-warm"),
             FilterType::Fade => fl!("filter-fade"),
             FilterType::Duotone => fl!("filter-duotone"),
