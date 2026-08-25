@@ -4030,7 +4030,7 @@ mod tests {
     /// blurred (white) frame wins, and any pixel in between is antialiasing.
     fn render_frosted_corner(corner_radius: f32) -> Option<Vec<[u8; 4]>> {
         const N: u32 = 64;
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -4147,7 +4147,9 @@ mod tests {
         let _ = device.poll(wgpu::PollType::wait_indefinitely());
         let data = slice.get_mapped_range().to_vec();
         Some(
-            data.chunks_exact(4)
+            data.as_chunks::<4>()
+                .0
+                .iter()
                 .map(|c| [c[0], c[1], c[2], c[3]])
                 .collect(),
         )
@@ -4215,7 +4217,7 @@ mod tests {
         const N: u32 = 64;
         const FRAME_W: u32 = 640;
         const FRAME_H: u32 = 480;
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -4332,7 +4334,9 @@ mod tests {
         let _ = device.poll(wgpu::PollType::wait_indefinitely());
         let data = slice.get_mapped_range();
         Some(
-            data.chunks_exact(4)
+            data.as_chunks::<4>()
+                .0
+                .iter()
                 .map(|c| [c[0], c[1], c[2], c[3]])
                 .collect(),
         )
@@ -4412,7 +4416,7 @@ mod tests {
         const FRAME_H: u32 = 480;
         const SWATCH: f32 = 32.0;
 
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -4569,7 +4573,9 @@ mod tests {
         let _ = device.poll(wgpu::PollType::wait_indefinitely());
         let data = slice.get_mapped_range();
         Some(
-            data.chunks_exact(4)
+            data.as_chunks::<4>()
+                .0
+                .iter()
                 .map(|c| [c[0], c[1], c[2], c[3]])
                 .collect(),
         )
@@ -4752,7 +4758,7 @@ mod tests {
 
         // And the ALLOCATION really is that big — read off the targets the
         // production path builds, not off the constant it was built from.
-        let Some((device, _queue)) = headless_device() else {
+        let Some((_gpu_test, device, _queue)) = headless_device() else {
             skip_no_gpu("the_step_allocation_covers_the_whole_table");
             return;
         };
@@ -4877,7 +4883,7 @@ mod tests {
         // rejects outright. Only max frost is clamped; every lower level still
         // gets its full 4x.
         let src = (n * 4).min(2048);
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -5077,7 +5083,7 @@ mod tests {
         const SQ_MIN: u32 = 80;
         const SQ_MAX: u32 = 112;
 
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -5314,7 +5320,7 @@ mod tests {
     ) -> Option<(f32, f32)> {
         const N: u32 = 256;
         const SRC: u32 = N * 4;
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -5967,7 +5973,7 @@ mod tests {
     ) -> Option<f32> {
         let sigma = kawase_sigma_model(params) as f32;
         let (n, disc_r, radii) = banding_fixture(sigma);
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let mut pipeline = VideoPipeline::new(&device, format);
 
         let target = device.create_texture(&wgpu::TextureDescriptor {
@@ -6253,7 +6259,7 @@ mod tests {
         down: bool,
         format: wgpu::TextureFormat,
     ) -> Option<Vec<f32>> {
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let mut pipeline = VideoPipeline::new(&device, format);
 
         let target = device.create_texture(&wgpu::TextureDescriptor {
@@ -6469,7 +6475,7 @@ mod tests {
     fn measure_composite_flat(video_id: u64) -> Option<(f32, f32)> {
         const N: u32 = 64;
         const GREY: u8 = 128;
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -6662,7 +6668,7 @@ mod tests {
         const BAR_TOP: f32 = 40.0;
         const BAR_BOTTOM: f32 = 60.0;
 
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -6901,7 +6907,7 @@ mod tests {
         const BAR_H: u32 = 64;
         const RADIUS: f32 = 24.0;
 
-        let Some((device, queue)) = headless_device() else {
+        let Some((_gpu_test, device, queue)) = headless_device() else {
             skip_no_gpu("each_frosted_bar_keeps_its_own_silhouette");
             return;
         };
@@ -7258,7 +7264,7 @@ mod tests {
         const SW: u32 = 256;
         const SH: u32 = 128;
 
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
 
@@ -7539,7 +7545,7 @@ mod tests {
         const SW: u32 = 1280;
         const SH: u32 = 960;
 
-        let (device, queue) = headless_device()?;
+        let (_gpu_test, device, queue) = headless_device()?;
         let format = wgpu::TextureFormat::Rgba8Unorm;
         let mut pipeline = VideoPipeline::new(&device, format);
         let target = device.create_texture(&wgpu::TextureDescriptor {
