@@ -326,3 +326,4 @@ controls-position-bottom = 底部
 controls-position-left = 左边
 controls-position-right = 右边
 settings-controls-position = 控制位置
+settings-controls-position-description = 将捕获控制放置于底部、左边或右边。左右控制也将标题栏移动到相对面边缘，并不会旋转相机预览。
