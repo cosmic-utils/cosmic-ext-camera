@@ -813,9 +813,14 @@ impl BurstModeGpuPipeline {
         );
 
         // Bayer finishing pipeline (HDR+ Section 6: demosaic + WB + CCM)
+        let bayer_finish_source = format!(
+            "{}\n{}",
+            crate::shaders::RAW_COLOUR_FUNCTIONS,
+            BAYER_FINISH_SHADER
+        );
         let bayer_finish_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
             label: Some("bayer_finish_shader"),
-            source: wgpu::ShaderSource::Wgsl(BAYER_FINISH_SHADER.into()),
+            source: wgpu::ShaderSource::Wgsl(bayer_finish_source.into()),
         });
         let bayer_finish_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
