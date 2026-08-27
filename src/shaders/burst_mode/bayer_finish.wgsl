@@ -49,7 +49,7 @@ fn sample_plane(x: i32, y: i32) -> vec4<f32> {
 }
 
 // Bilinear interpolation helper for a single channel
-fn bilinear_channel(fx: f32, fy: f32, ix: i32, iy: i32, ch: u32) -> f32 {
+fn bilinear_channel_with_peak(fx: f32, fy: f32, ix: i32, iy: i32, ch: u32) -> vec2<f32> {
     let s00 = sample_plane(ix, iy)[ch];
     let s10 = sample_plane(ix + 1, iy)[ch];
     let s01 = sample_plane(ix, iy + 1)[ch];
@@ -58,7 +58,9 @@ fn bilinear_channel(fx: f32, fy: f32, ix: i32, iy: i32, ch: u32) -> f32 {
     let wx = fx - f32(ix);
     let wy = fy - f32(iy);
 
-    return mix(mix(s00, s10, wx), mix(s01, s11, wx), wy);
+    let value = mix(mix(s00, s10, wx), mix(s01, s11, wx), wy);
+    let peak = max(max(s00, s10), max(s01, s11));
+    return vec2<f32>(value, peak);
 }
 
 @compute @workgroup_size(16, 16)
@@ -95,27 +97,36 @@ fn demosaic_and_finish(@builtin(global_invocation_id) gid: vec3<u32>) {
 
     // Interpolate each channel from its plane using bilinear filtering
     // Channel 0 = R, 1 = Gr, 2 = B, 3 = Gb
-    let r = bilinear_channel(px, py, ix, iy, 0u);
-    let gr = bilinear_channel(px, py, ix, iy, 1u);
-    let b = bilinear_channel(px, py, ix, iy, 2u);
-    let gb = bilinear_channel(px, py, ix, iy, 3u);
+    let r_sample = bilinear_channel_with_peak(px, py, ix, iy, 0u);
+    let gr_sample = bilinear_channel_with_peak(px, py, ix, iy, 1u);
+    let b_sample = bilinear_channel_with_peak(px, py, ix, iy, 2u);
+    let gb_sample = bilinear_channel_with_peak(px, py, ix, iy, 3u);
+    let r = r_sample.x;
+    let gr = gr_sample.x;
+    let b = b_sample.x;
+    let gb = gb_sample.x;
 
     // Average the two green channels (Gr and Gb) for the green component
     let g = (gr + gb) * 0.5;
+    let sensor_peak = clamp(
+        max(max(r_sample.y, b_sample.y), max(gr_sample.y, gb_sample.y)),
+        0.0,
+        1.0,
+    );
 
     // Apply white balance and colour correction if enabled
     var rgb = vec3<f32>(r, g, b);
 
     if params.use_colour == 1u {
-        // White balance: scale R and B by ISP gains
-        rgb.x *= params.gain_r;
-        rgb.z *= params.gain_b;
-
-        // Colour correction matrix (3×3, row-major)
-        let ccm_r = dot(rgb, params.ccm_row0.xyz);
-        let ccm_g = dot(rgb, params.ccm_row1.xyz);
-        let ccm_b = dot(rgb, params.ccm_row2.xyz);
-        rgb = vec3<f32>(ccm_r, ccm_g, ccm_b);
+        rgb = apply_raw_colour(
+            rgb,
+            sensor_peak,
+            params.gain_r,
+            params.gain_b,
+            params.ccm_row0.xyz,
+            params.ccm_row1.xyz,
+            params.ccm_row2.xyz,
+        );
     }
 
     // Clamp to valid range (CCM can produce values outside 0..1)

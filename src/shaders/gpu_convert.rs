@@ -478,11 +478,13 @@ impl GpuConvertPipeline {
     fn ensure_debayer_pipeline(&mut self) {
         if self.debayer_pipeline.is_none() {
             debug!("Creating debayer pipeline");
-            self.debayer_pipeline = Some(self.create_pipeline(
-                include_str!("debayer.wgsl"),
-                "debayer",
-                &Self::BIND_LAYOUT_DEBAYER,
-            ));
+            let shader_source = format!(
+                "{}\n{}",
+                super::RAW_COLOUR_FUNCTIONS,
+                include_str!("debayer.wgsl")
+            );
+            self.debayer_pipeline =
+                Some(self.create_pipeline(&shader_source, "debayer", &Self::BIND_LAYOUT_DEBAYER));
         }
     }
 

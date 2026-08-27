@@ -104,32 +104,63 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     var b: f32;
 
     let center = sample_bayer(ix, iy);
+    var sensor_peak_raw = center;
 
     // Bilinear interpolation based on pixel position in Bayer pattern
     if (pixel_type == 0u) {
         // Red pixel - interpolate G and B
+        let top_left = sample_bayer(ix - 1, iy - 1);
+        let top = sample_bayer(ix, iy - 1);
+        let top_right = sample_bayer(ix + 1, iy - 1);
+        let left = sample_bayer(ix - 1, iy);
+        let right = sample_bayer(ix + 1, iy);
+        let bottom_left = sample_bayer(ix - 1, iy + 1);
+        let bottom = sample_bayer(ix, iy + 1);
+        let bottom_right = sample_bayer(ix + 1, iy + 1);
         r = center;
-        g = (sample_bayer(ix - 1, iy) + sample_bayer(ix + 1, iy) +
-             sample_bayer(ix, iy - 1) + sample_bayer(ix, iy + 1)) * 0.25;
-        b = (sample_bayer(ix - 1, iy - 1) + sample_bayer(ix + 1, iy - 1) +
-             sample_bayer(ix - 1, iy + 1) + sample_bayer(ix + 1, iy + 1)) * 0.25;
+        g = (left + right + top + bottom) * 0.25;
+        b = (top_left + top_right + bottom_left + bottom_right) * 0.25;
+        sensor_peak_raw = max(
+            max(max(top_left, top), max(top_right, left)),
+            max(max(center, right), max(bottom_left, max(bottom, bottom_right))),
+        );
     } else if (pixel_type == 1u) {
         // Green pixel on R row - interpolate R (horizontal neighbors) and B (vertical neighbors)
-        r = (sample_bayer(ix - 1, iy) + sample_bayer(ix + 1, iy)) * 0.5;
+        let top = sample_bayer(ix, iy - 1);
+        let left = sample_bayer(ix - 1, iy);
+        let right = sample_bayer(ix + 1, iy);
+        let bottom = sample_bayer(ix, iy + 1);
+        r = (left + right) * 0.5;
         g = center;
-        b = (sample_bayer(ix, iy - 1) + sample_bayer(ix, iy + 1)) * 0.5;
+        b = (top + bottom) * 0.5;
+        sensor_peak_raw = max(max(center, top), max(bottom, max(left, right)));
     } else if (pixel_type == 2u) {
         // Green pixel on B row - interpolate R (vertical neighbors) and B (horizontal neighbors)
-        r = (sample_bayer(ix, iy - 1) + sample_bayer(ix, iy + 1)) * 0.5;
+        let top = sample_bayer(ix, iy - 1);
+        let left = sample_bayer(ix - 1, iy);
+        let right = sample_bayer(ix + 1, iy);
+        let bottom = sample_bayer(ix, iy + 1);
+        r = (top + bottom) * 0.5;
         g = center;
-        b = (sample_bayer(ix - 1, iy) + sample_bayer(ix + 1, iy)) * 0.5;
+        b = (left + right) * 0.5;
+        sensor_peak_raw = max(max(center, top), max(bottom, max(left, right)));
     } else {
         // Blue pixel - interpolate R and G
-        r = (sample_bayer(ix - 1, iy - 1) + sample_bayer(ix + 1, iy - 1) +
-             sample_bayer(ix - 1, iy + 1) + sample_bayer(ix + 1, iy + 1)) * 0.25;
-        g = (sample_bayer(ix - 1, iy) + sample_bayer(ix + 1, iy) +
-             sample_bayer(ix, iy - 1) + sample_bayer(ix, iy + 1)) * 0.25;
+        let top_left = sample_bayer(ix - 1, iy - 1);
+        let top = sample_bayer(ix, iy - 1);
+        let top_right = sample_bayer(ix + 1, iy - 1);
+        let left = sample_bayer(ix - 1, iy);
+        let right = sample_bayer(ix + 1, iy);
+        let bottom_left = sample_bayer(ix - 1, iy + 1);
+        let bottom = sample_bayer(ix, iy + 1);
+        let bottom_right = sample_bayer(ix + 1, iy + 1);
+        r = (top_left + top_right + bottom_left + bottom_right) * 0.25;
+        g = (left + right + top + bottom) * 0.25;
         b = center;
+        sensor_peak_raw = max(
+            max(max(top_left, top), max(top_right, left)),
+            max(max(center, right), max(bottom_left, max(bottom, bottom_right))),
+        );
     }
 
     // Apply white balance and colour correction (in linear space, before gamma)
@@ -140,16 +171,21 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         r = max(r - bl, 0.0) * scale;
         g = max(g - bl, 0.0) * scale;
         b = max(b - bl, 0.0) * scale;
+        let sensor_peak = clamp(max(sensor_peak_raw - bl, 0.0) * scale, 0.0, 1.0);
 
-        // White balance gains from storage buffer (ISP or GPU AWB computed)
-        r = r * awb_gains.gain_r;
-        b = b * awb_gains.gain_b;
-
-        // Colour correction matrix (sensor RGB -> sRGB)
-        let linear = vec3(r, g, b);
-        r = dot(linear, params.ccm_row0.xyz);
-        g = dot(linear, params.ccm_row1.xyz);
-        b = dot(linear, params.ccm_row2.xyz);
+        // White balance, clipped-highlight reconstruction, and sensor RGB -> sRGB CCM.
+        let corrected = apply_raw_colour(
+            vec3(r, g, b),
+            sensor_peak,
+            awb_gains.gain_r,
+            awb_gains.gain_b,
+            params.ccm_row0.xyz,
+            params.ccm_row1.xyz,
+            params.ccm_row2.xyz,
+        );
+        r = corrected.r;
+        g = corrected.g;
+        b = corrected.b;
     }
 
     // Clamp to [0,1] range
