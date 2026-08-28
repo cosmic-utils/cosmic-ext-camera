@@ -379,6 +379,19 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.3.3" date="2026-08-28">
+      <description>
+        <p>Release 1.3.3 includes the following changes:</p>
+        <ul>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump uuid from 1.24.1 to 1.25.0 in the rust-dependencies group</li>
+          <li>docs: add Alpine package badge</li>
+          <li>fix(capture): recover clipped RAW highlights</li>
+          <li>docs: fix Alpine package badge</li>
+          <li>deps(cargo): bump open from 5.4.1 to 5.4.2 in the rust-dependencies group</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.2" date="2026-08-25">
       <description>
         <p>Release 1.3.2 includes the following changes:</p>
