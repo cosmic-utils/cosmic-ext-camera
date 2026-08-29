@@ -1,6 +1,6 @@
 [package]
 name = "camera"
-version = "1.3.3"
+version = "1.3.4"
 edition = "2024"
 license = "GPL-3.0-only"
 description = "Modern camera app for Linux desktops and phones"
