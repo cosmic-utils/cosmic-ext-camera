@@ -100,6 +100,16 @@ impl PostProcessor {
         let config = self.config.clone();
         let frame_width = frame.width;
         let frame_height = frame.height;
+        let compact_rgba = if frame.format == PixelFormat::RGBA {
+            Some(Self::copy_rgba_without_padding(
+                frame.data.as_ref(),
+                frame.width,
+                frame.height,
+                frame.stride,
+            )?)
+        } else {
+            None
+        };
 
         // Step 0: Convert to RGBA (with optional integrated filter for Bayer)
         let filtered_rgba: Vec<u8> = if frame.format.is_bayer()
@@ -149,7 +159,7 @@ impl PostProcessor {
             }
         } else if config.filter_type != FilterType::Standard {
             // Already RGBA, just apply filter
-            let rgba = frame.data.to_vec();
+            let rgba = compact_rgba.unwrap_or_else(|| frame.data.to_vec());
             match apply_filter_gpu_rgba(&rgba, frame_width, frame_height, config.filter_type).await
             {
                 Ok(filtered) => filtered,
@@ -158,8 +168,9 @@ impl PostProcessor {
                     rgba
                 }
             }
+        } else if let Some(rgba) = compact_rgba {
+            rgba
         } else {
-            // Already RGBA, no filter
             frame.data.to_vec()
         };
 
@@ -376,6 +387,49 @@ impl PostProcessor {
             .ok_or_else(|| "Failed to create RGB image from converted data".to_string())
     }
 
+    fn copy_rgba_without_padding(
+        data: &[u8],
+        width: u32,
+        height: u32,
+        stride: u32,
+    ) -> Result<Vec<u8>, String> {
+        let row_bytes = width
+            .checked_mul(4)
+            .ok_or_else(|| "RGBA row size overflow".to_string())? as usize;
+        let stride = stride as usize;
+        if stride < row_bytes {
+            return Err(format!(
+                "RGBA stride too small: expected at least {row_bytes}, got {stride}"
+            ));
+        }
+
+        let height = height as usize;
+        let required = if height == 0 {
+            0
+        } else {
+            (height - 1)
+                .checked_mul(stride)
+                .and_then(|offset| offset.checked_add(row_bytes))
+                .ok_or_else(|| "RGBA buffer size overflow".to_string())?
+        };
+        if data.len() < required {
+            return Err(format!(
+                "RGBA data too small for stride: expected {required}, got {}",
+                data.len()
+            ));
+        }
+
+        let capacity = row_bytes
+            .checked_mul(height)
+            .ok_or_else(|| "RGBA compact buffer size overflow".to_string())?;
+        let mut compact = Vec::with_capacity(capacity);
+        for row in 0..height {
+            let start = row * stride;
+            compact.extend_from_slice(&data[start..start + row_bytes]);
+        }
+        Ok(compact)
+    }
+
     /// Apply zoom by center-cropping the RGBA image
     ///
     /// At zoom_level 2.0, the center 50% of the image is cropped and returned.
@@ -528,5 +582,20 @@ mod tests {
         assert_eq!(config.brightness, 0.0);
         assert_eq!(config.contrast, 1.0);
         assert_eq!(config.saturation, 1.0);
+    }
+
+    #[test]
+    fn padded_rgba_rows_are_compacted_before_cpu_processing() {
+        let padded = [
+            1, 2, 3, 4, 5, 6, 7, 8, 99, 99, 99, 99, // row 0 + padding
+            9, 10, 11, 12, 13, 14, 15, 16, 88, 88, 88, 88, // row 1 + padding
+        ];
+
+        let compact = PostProcessor::copy_rgba_without_padding(&padded, 2, 2, 12).unwrap();
+
+        assert_eq!(
+            compact,
+            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        );
     }
 }

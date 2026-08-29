@@ -317,6 +317,7 @@ impl AppModel {
 
         let still_frame = Arc::clone(&self.latest_still_frame);
         let still_frame_notify = Arc::clone(&self.still_frame_notify);
+        let preview_frame = self.current_frame.as_ref().map(Arc::clone);
         let save_dir = crate::app::get_photo_directory(&self.config.save_folder_name);
         let filter_type = self.selected_filter;
         let zoom_level = self.zoom_level;
@@ -344,72 +345,139 @@ impl AppModel {
 
         let camera_metadata = self.build_camera_metadata();
 
+        let raw_save_dir = save_dir.clone();
+        let raw_camera_metadata = camera_metadata.clone();
         let save_task = Task::perform(
-            async move {
-                use crate::pipelines::photo::{
-                    EncodingQuality, PhotoPipeline, PostProcessingConfig,
-                };
-
-                // Wait for the raw frame with a timeout, blocking on the
-                // capture-thread notifier instead of polling.
-                let timeout = std::time::Duration::from_secs(2);
-                let frame = wait_for_still_frame(&still_frame, &still_frame_notify, timeout)
-                    .await
-                    .ok_or_else(|| "Timeout waiting for raw frame from still stream".to_string())?;
-
-                info!(
-                    width = frame.width,
-                    height = frame.height,
-                    format = ?frame.format,
-                    "Raw frame captured from still stream"
-                );
-
-                let (rw, rh) = if geometry_rotation.swaps_dimensions() {
-                    (frame.height, frame.width)
-                } else {
-                    (frame.width, frame.height)
-                };
-                let crop_rect = {
-                    let (x, y, w, h) = if preview_fit_to_view {
-                        photo_aspect_ratio.crop_rect(rw, rh, portrait)
-                    } else {
-                        crate::app::preview_geometry::cover_capture_crop(
-                            rw,
-                            rh,
-                            cover_screen_w,
-                            cover_screen_h,
-                            cover_insets,
-                            cover_target_ratio,
-                        )
+            capture_with_preview_fallback(
+                move || async move {
+                    use crate::pipelines::photo::{
+                        EncodingQuality, PhotoPipeline, PostProcessingConfig,
                     };
-                    if x == 0 && y == 0 && w == rw && h == rh {
-                        None
-                    } else {
-                        Some(crate::app::preview_geometry::inverse_oriented_crop(
-                            (x, y, w, h),
-                            frame.width,
-                            frame.height,
-                            geometry_rotation,
-                        ))
-                    }
-                };
 
-                let config = PostProcessingConfig {
-                    filter_type,
-                    crop_rect,
-                    zoom_level,
-                    rotation: media_rotation,
-                    mirror_horizontal,
-                    ..Default::default()
-                };
-                let mut pipeline =
-                    PhotoPipeline::with_config(config, encoding_format, EncodingQuality::High);
-                pipeline.set_camera_metadata(camera_metadata);
-                pipeline
-                    .capture_and_save(Arc::new(frame), save_dir)
-                    .await
-                    .map(|p| p.display().to_string())
-            },
+                    // Wait for the raw frame with a timeout, blocking on the
+                    // capture-thread notifier instead of polling.
+                    let timeout = std::time::Duration::from_secs(2);
+                    let frame = wait_for_still_frame(&still_frame, &still_frame_notify, timeout)
+                        .await
+                        .ok_or_else(|| {
+                            "Timeout waiting for raw frame from still stream".to_string()
+                        })?;
+
+                    info!(
+                        width = frame.width,
+                        height = frame.height,
+                        format = ?frame.format,
+                        "Raw frame captured from still stream"
+                    );
+
+                    let (rw, rh) = if geometry_rotation.swaps_dimensions() {
+                        (frame.height, frame.width)
+                    } else {
+                        (frame.width, frame.height)
+                    };
+                    let crop_rect = {
+                        let (x, y, w, h) = if preview_fit_to_view {
+                            photo_aspect_ratio.crop_rect(rw, rh, portrait)
+                        } else {
+                            crate::app::preview_geometry::cover_capture_crop(
+                                rw,
+                                rh,
+                                cover_screen_w,
+                                cover_screen_h,
+                                cover_insets,
+                                cover_target_ratio,
+                            )
+                        };
+                        if x == 0 && y == 0 && w == rw && h == rh {
+                            None
+                        } else {
+                            Some(crate::app::preview_geometry::inverse_oriented_crop(
+                                (x, y, w, h),
+                                frame.width,
+                                frame.height,
+                                geometry_rotation,
+                            ))
+                        }
+                    };
+
+                    let config = PostProcessingConfig {
+                        filter_type,
+                        crop_rect,
+                        zoom_level,
+                        rotation: media_rotation,
+                        mirror_horizontal,
+                        ..Default::default()
+                    };
+                    let mut pipeline =
+                        PhotoPipeline::with_config(config, encoding_format, EncodingQuality::High);
+                    pipeline.set_camera_metadata(raw_camera_metadata);
+                    pipeline
+                        .capture_and_save(Arc::new(frame), raw_save_dir)
+                        .await
+                        .map(|p| p.display().to_string())
+                },
+                move || async move {
+                    use crate::pipelines::photo::{
+                        EncodingQuality, PhotoPipeline, PostProcessingConfig,
+                    };
+
+                    let frame = preview_frame.ok_or_else(|| {
+                        "Raw capture failed and no preview frame is available".to_string()
+                    })?;
+                    info!(
+                        width = frame.width,
+                        height = frame.height,
+                        format = ?frame.format,
+                        "Saving ISP-processed preview frame as CPU fallback"
+                    );
+
+                    let (fw, fh) = if geometry_rotation.swaps_dimensions() {
+                        (frame.height, frame.width)
+                    } else {
+                        (frame.width, frame.height)
+                    };
+                    let crop_rect = {
+                        let (x, y, w, h) = if preview_fit_to_view {
+                            photo_aspect_ratio.crop_rect(fw, fh, portrait)
+                        } else {
+                            crate::app::preview_geometry::cover_capture_crop(
+                                fw,
+                                fh,
+                                cover_screen_w,
+                                cover_screen_h,
+                                cover_insets,
+                                cover_target_ratio,
+                            )
+                        };
+                        if x == 0 && y == 0 && w == fw && h == fh {
+                            None
+                        } else {
+                            Some(crate::app::preview_geometry::inverse_oriented_crop(
+                                (x, y, w, h),
+                                frame.width,
+                                frame.height,
+                                geometry_rotation,
+                            ))
+                        }
+                    };
+
+                    let config = PostProcessingConfig {
+                        filter_type,
+                        crop_rect,
+                        zoom_level,
+                        rotation: media_rotation,
+                        mirror_horizontal,
+                        ..Default::default()
+                    };
+                    let mut pipeline =
+                        PhotoPipeline::with_config(config, encoding_format, EncodingQuality::High);
+                    pipeline.set_camera_metadata(camera_metadata);
+                    pipeline
+                        .capture_and_save(frame, save_dir)
+                        .await
+                        .map(|p| p.display().to_string())
+                },
+            ),
             |result| cosmic::Action::App(Message::PhotoSaved(result)),
         );
 
@@ -2303,6 +2371,34 @@ async fn save_first_burst_frame(
     Ok(path)
 }
 
+/// Run the full-resolution raw save first, then reuse the existing
+/// ISP-processed preview save path when raw processing is unavailable.
+async fn capture_with_preview_fallback<T, Raw, RawFuture, Preview, PreviewFuture>(
+    raw_capture: Raw,
+    preview_capture: Preview,
+) -> Result<T, String>
+where
+    Raw: FnOnce() -> RawFuture,
+    RawFuture: std::future::Future<Output = Result<T, String>>,
+    Preview: FnOnce() -> PreviewFuture,
+    PreviewFuture: std::future::Future<Output = Result<T, String>>,
+{
+    match raw_capture().await {
+        Ok(value) => Ok(value),
+        Err(raw_error) => {
+            warn!(
+                error = %raw_error,
+                "Raw photo processing unavailable; falling back to ISP-processed preview frame"
+            );
+            preview_capture().await.map_err(|preview_error| {
+                format!(
+                    "Raw photo processing failed: {raw_error}; preview fallback failed: {preview_error}"
+                )
+            })
+        }
+    }
+}
+
 /// Wait for a still frame to appear in the shared mutex.
 ///
 /// Awaits a notification from the capture thread (no polling), then takes the
@@ -2334,5 +2430,45 @@ pub(super) async fn wait_for_still_frame(
         if tokio::time::timeout(remaining, notified).await.is_err() {
             return None;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::capture_with_preview_fallback;
+    use std::cell::Cell;
+
+    #[tokio::test]
+    async fn raw_capture_failure_uses_preview_fallback() {
+        let fallback_called = Cell::new(false);
+
+        let result = capture_with_preview_fallback(
+            || async { Err::<&'static str, _>("raw GPU unavailable".to_string()) },
+            || async {
+                fallback_called.set(true);
+                Ok::<_, String>("preview.jpg")
+            },
+        )
+        .await;
+
+        assert_eq!(result, Ok("preview.jpg"));
+        assert!(fallback_called.get());
+    }
+
+    #[tokio::test]
+    async fn raw_capture_success_does_not_use_preview_fallback() {
+        let fallback_called = Cell::new(false);
+
+        let result = capture_with_preview_fallback(
+            || async { Ok::<_, String>("raw.jpg") },
+            || async {
+                fallback_called.set(true);
+                Ok::<_, String>("preview.jpg")
+            },
+        )
+        .await;
+
+        assert_eq!(result, Ok("raw.jpg"));
+        assert!(!fallback_called.get());
     }
 }
