@@ -177,6 +177,8 @@ modules:
       - install -Dm644 resources/icons/hicolor/64x64/apps/io.github.cosmic_utils.camera.png -t /app/share/icons/hicolor/64x64/apps/
       - install -Dm644 resources/icons/hicolor/128x128/apps/io.github.cosmic_utils.camera.png -t /app/share/icons/hicolor/128x128/apps/
       - install -Dm644 resources/icons/hicolor/256x256/apps/io.github.cosmic_utils.camera.png -t /app/share/icons/hicolor/256x256/apps/
+      - install -Dm644 resources/icons/hicolor/512x512/apps/io.github.cosmic_utils.camera.png -t /app/share/icons/hicolor/512x512/apps/
+      - install -Dm644 resources/icons/hicolor/1024x1024/apps/io.github.cosmic_utils.camera.png -t /app/share/icons/hicolor/1024x1024/apps/
       # Install metainfo
       - install -Dm644 resources/io.github.cosmic_utils.camera.metainfo.xml -t /app/share/metainfo/
     sources:
