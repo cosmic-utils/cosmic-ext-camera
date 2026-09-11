@@ -95,6 +95,13 @@ features = [
     "xdg-portal",
 ]
 
+# Keep libcosmic and its iced submodule on one cosmic-protocols revision so
+# Cargo's offline vendor cannot see duplicate packages from two git sources.
+# The www alias makes this a distinct patch source while GitHub redirects it.
+[patch."https://github.com/pop-os/cosmic-protocols"]
+cosmic-client-toolkit = { git = "https://www.github.com/pop-os/cosmic-protocols", rev = "c0cff4d" }
+cosmic-protocols = { git = "https://www.github.com/pop-os/cosmic-protocols", rev = "c0cff4d" }
+
 [profile.release]
 lto = "fat"
 codegen-units = 1
