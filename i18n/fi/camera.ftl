@@ -1,6 +1,6 @@
 camera = Kamera
 about = Tietoa
-repository = Tietolähde
+repository = Lähdekoodi
 mode-video = Video
 mode-photo = Kuva
 mode-timelapse = Aikaviive
