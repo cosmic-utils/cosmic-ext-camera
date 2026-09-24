@@ -81,9 +81,10 @@ to do. Only en gets the full appearance matrix above.
 - &lrm;[**Wênekêş** (`kmr`)](locales/kmr/README.md) &mdash; 6 shots, 0/6 captions translated
 - &lrm;[**Aparat** (`pl`)](locales/pl/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Câmera** (`pt-BR`)](locales/pt-BR/README.md) &mdash; 6 shots, 6/6 captions translated
+- &lrm;[**Камера** (`ru`)](locales/ru/README.md) &mdash; 6 shots, 0/6 captions translated
 - &lrm;[**Kamera** (`sv`)](locales/sv/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**Kamera** (`tr`)](locales/tr/README.md) &mdash; 6 shots, 0/6 captions translated
-- &lrm;[**Камера** (`uk`)](locales/uk/README.md) &mdash; 6 shots, 4/6 captions translated
+- &lrm;[**Камера** (`uk`)](locales/uk/README.md) &mdash; 6 shots, 6/6 captions translated
 - &lrm;[**相机** (`zh-CN`)](locales/zh-CN/README.md) &mdash; 6 shots, 6/6 captions translated
 
 
