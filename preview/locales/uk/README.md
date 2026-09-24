@@ -6,13 +6,9 @@
 
 |  |  |
 | :---: | :---: |
-| ![Photo mode with tools menu](preview-001.png)<br>**Photo mode with tools menu** | ![Photo mode on a Linux phone](preview-002.png)<br>**Photo mode on a Linux phone** |
+| ![Режим фото з панеллю інструментів](preview-001.png)<br>**Режим фото з панеллю інструментів** | ![Режим знімку на Linux-телефоні](preview-002.png)<br>**Режим знімку на Linux-телефоні** |
 | ![Вибір фільтрів](preview-003.png)<br>**Вибір фільтрів** | ![Запис відео триває](preview-004.png)<br>**Запис відео триває** |
 | ![Виявлення QR-коду](preview-005.png)<br>**Виявлення QR-коду** | ![Розширені налаштування](preview-006.png)<br>**Розширені налаштування** |
-
-> 2 of 6 captions are not translated into `uk` yet
-> and are shown in English. Translations are welcome in
-> [`i18n/uk/camera.ftl`](../../../i18n/uk/camera.ftl).
 
 ---
 
