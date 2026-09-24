@@ -16,6 +16,7 @@
   <name xml:lang="kmr">Wênekêş</name>
   <name xml:lang="pl">Aparat</name>
   <name xml:lang="pt-BR">Câmera</name>
+  <name xml:lang="ru">Камера</name>
   <name xml:lang="sv">Kamera</name>
   <name xml:lang="tr">Kamera</name>
   <name xml:lang="uk">Камера</name>
@@ -41,6 +42,7 @@
     <p xml:lang="pl">Aparat jest nowoczesną aplikacją aparatu dla Linuxa, zbudowaną zarówno dla komputerów i telefonów. Jeśli masz ochotę zrobić szybkie zdjęcie, nagrać film lub zeskanować kod QR, Aparat dostarcza przejrzystego i intuicyjnego interfejsu który Ci w tym nie przeszkadza.</p>
     <p xml:lang="pt-BR">O Câmera é um aplicativo de câmera moderno para Linux, desenvolvido para desktops e celulares. Seja para tirar uma foto rápida, gravar um vídeo ou escanear um código QR, o Câmera oferece uma interface limpa e intuitiva que não interfere na sua experiência.</p>
     <p xml:lang="sv">Kamera är ett modernt kamera program för Linux, byggt för både stationära datorer och telefoner. Oavsett om du behöver ta ett snabbt foto, spela in en video eller skanna en QR-kod, så gerKamera dig ett rent och intuitivt gränssnitt som håller sig ur vägen.</p>
+    <p xml:lang="uk">Камера — це сучасний застосунок камери для Linux, розроблений як для стільниць, так і для телефонів. Чи потрібно швидко зробити знімок, записати відео, чи відсканувати QR-код, Камера пропонує чистий та інтуїтивно зрозумілий інтерфейс, який не відвертає увагу.</p>
     <p xml:lang="zh-CN">相机 是个现代 Linux 相机应用程序。专为电脑与手机设计。无论您需要快速拍照、录制视频还是扫描二维码，相机 能提供简洁直观的界面，不妨碍您的操作。</p>
     <p>Just open the app and start capturing moments. Add fun filters to your photos, scan QR codes to open links or connect to WiFi, or use virtual camera mode to look great in video calls with your favorite filter applied.</p>
     <p xml:lang="cs">Otevřete aplikaci a začněte zachycovat okamžiky. Přidejte zábavné filtry ke svým fotografiím, skenujte QR kódy pro otevření odkazů nebo připojení k Wi-Fi, případně použijte režim virtuální kamery, abyste při videohovorech vypadali skvěle s aplikovaným oblíbeným filtrem.</p>
@@ -85,6 +87,7 @@
       <li xml:lang="pl">Zdjęcia, filmy i tryb filmu poklatkowego, z własnym stoperem i przewodnikiem po regułach kompozycji</li>
       <li xml:lang="pt-BR">Modos de foto, vídeo e timelapse, com temporizador automático e guias de composição</li>
       <li xml:lang="sv">Foto, video- och timelapse-lägen, med självutlösare och kompositionsguider</li>
+      <li xml:lang="uk">Режими фото, відео та прискорення, з таймером і напрямними композиції</li>
       <li xml:lang="zh-CN">照片、视频与延时摄影模式，并带有自拍定时气器和构图指南</li>
       <li>Manual controls: exposure, ISO, shutter, focus and white balance</li>
       <li xml:lang="cs">Manuální ovládání: expozice, ISO, závěrka, ostření a vyvážení bílé</li>
@@ -95,6 +98,7 @@
       <li xml:lang="pl">Ręczne sterowanie: czas naświetlenia, ISO, migawka, skupienie oraz balans bieli</li>
       <li xml:lang="pt-BR">Controles manuais: exposição, ISO, disparador, foco e balanço de branco</li>
       <li xml:lang="sv">Manuella kontroller: exponering, ISO, slutare, fokus och vitbalans</li>
+      <li xml:lang="uk">Ручне керування: експозиція, ISO, витримка, фокус і баланс білого</li>
       <li xml:lang="zh-CN">手动控制：曝光、ISO、快门、聚焦和白平衡</li>
       <li>QR code scanner: open links, connect to WiFi, and more</li>
       <li xml:lang="cs">Skener QR kódů: otevírání odkazů, připojení k Wi-Fi a další</li>
@@ -209,6 +213,7 @@
       <caption xml:lang="pl">Tryb zdjęciowy z menu narzędziowym</caption>
       <caption xml:lang="pt-BR">Modo foto com menu de ferramentas</caption>
       <caption xml:lang="sv">Fotoläge med verktygsmeny</caption>
+      <caption xml:lang="uk">Режим фото з панеллю інструментів</caption>
       <caption xml:lang="zh-CN">带有工具菜单的拍照模式</caption>
       <image>https://media.githubusercontent.com/media/cosmic-utils/cosmic-ext-camera/main/preview/preview-001.png</image>
       <image xml:lang="ar">https://media.githubusercontent.com/media/cosmic-utils/cosmic-ext-camera/main/preview/locales/ar/preview-001.png</image>
@@ -238,6 +243,7 @@
       <caption xml:lang="pl">Tryb zdjęciowy na telefonie z Linuxem</caption>
       <caption xml:lang="pt-BR">Modo foto em um telefone Linux</caption>
       <caption xml:lang="sv">Fotoläge med en Linux telefon</caption>
+      <caption xml:lang="uk">Режим знімку на Linux-телефоні</caption>
       <caption xml:lang="zh-CN">Linux 手机的拍照模式</caption>
       <image>https://media.githubusercontent.com/media/cosmic-utils/cosmic-ext-camera/main/preview/preview-002.png</image>
       <image xml:lang="ar">https://media.githubusercontent.com/media/cosmic-utils/cosmic-ext-camera/main/preview/locales/ar/preview-002.png</image>
