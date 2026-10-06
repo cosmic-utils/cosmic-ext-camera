@@ -126,7 +126,7 @@ hdr-plus-frames-50 = 50 snímků
 # Photo settings
 settings-photo = Fotografie
 settings-photo-format = Výstupní formát
-settings-photo-format-description = Formát souboru pro uložené fotografie. JPEG je komprimovaný, PNG je bezztrátový, DNG zachovává raw data pro úpravy.
+settings-photo-format-description = Formát souboru pro uložené fotografie. JPEG a AVIF jsou ztrátové, PNG je bezztrátový, DNG zachovává raw data pro úpravy.
 settings-hdr-plus = HDR+ (experimentální)
 settings-hdr-plus-description = Vícesnímkové snímání pro lepší fotografie při slabém osvětlení a vyšší dynamický rozsah. Automatický režim volí počet snímků podle jasu scény.
 settings-save-burst-raw = Uložit raw snímky sekvence
