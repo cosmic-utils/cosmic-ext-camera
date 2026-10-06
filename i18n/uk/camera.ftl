@@ -130,7 +130,7 @@ hdr-plus-frames-50 = 50 кадрів
 # Photo settings
 settings-photo = Знімок
 settings-photo-format = Формат знімків
-settings-photo-format-description = Формати для збережених знімків. JPEG (стиснений), PNG (без втрат якості), а DNG зберігає найбільше даних для подальшої обробки.
+settings-photo-format-description = Формати для збережених знімків. JPEG і AVIF (стиснений), PNG (без втрат якості), а DNG зберігає найбільше даних для подальшої обробки.
 settings-hdr-plus = HDR+ (експериментально)
 settings-hdr-plus-description = Багатокадрова зйомка для кращих знімків при слабкому освітленні та ширшого динамічного діапазону. Авто підбирає кількість кадрів залежно від яскравості сцени.
 settings-save-burst-raw = Зберігати сирці серії
