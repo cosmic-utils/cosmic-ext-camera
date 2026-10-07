@@ -121,7 +121,7 @@ hdr-plus-frames-50 = 50 帧
 # Photo settings
 settings-photo = 照片
 settings-photo-format = 输出格式
-settings-photo-format-description = 保存照片的文件格式。JPEG 为压缩格式，PNG 为无损格式，DNG 保留原始数据用于编辑。
+settings-photo-format-description = 保存照片的文件格式。JPEG 和 AVIF 为压缩格式，PNG 为无损格式，DNG 保留原始数据用于编辑。
 settings-hdr-plus = HDR+（实验性）
 settings-hdr-plus-description = 多帧捕捉以改善低光照片和动态范围。自动根据场景亮度选择帧数。
 settings-save-burst-raw = 保存原始连拍帧
