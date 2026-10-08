@@ -122,7 +122,7 @@ hdr-plus-frames-50 = 50 bildrutor
 # Fotoinställningar
 settings-photo = Foto
 settings-photo-format = Utdataformat
-settings-photo-format-description = Filformat för sparade foton. JPEG är komprimerat, PNG är förlustfritt, DNG bevarar rådata för redigering.
+settings-photo-format-description = Filformat för sparade foton. JPEG och AVIF är förlustbringande, PNG är förlustfritt, DNG bevarar rådata för redigering.
 settings-hdr-plus = HDR+ (experimentellt)
 settings-hdr-plus-description = Flerbildstagning för förbättrade bilder i svagt ljus och dynamiskt omfång. Väljer automatiskt bildantal baserat på motivets ljusstyrka.
 settings-save-burst-raw = Spara råa burst-bildrutor
