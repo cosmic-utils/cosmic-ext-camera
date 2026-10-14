@@ -2,7 +2,7 @@
 
 # Câmera (pt-BR)
 
-*Capture fotos e vídeos.*
+*Capture fotos, vídeos e códigos QR.*
 
 |  |  |
 | :---: | :---: |
