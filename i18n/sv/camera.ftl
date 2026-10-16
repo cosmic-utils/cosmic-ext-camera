@@ -26,7 +26,7 @@ settings-video = Video
 settings-device = Enhet
 settings-microphone = Mikrofon
 settings-record-audio = Spela in ljud
-settings-audio-encoder = Ljudkodare
+settings-audio-encoder = Video ljudkodare
 settings-encoder = Kodare
 settings-quality = Kvalitet
 settings-mirror-preview = Spegelförhandsvisning
@@ -328,3 +328,22 @@ settings-controls-position-description = Placera inspelningskontrollerna längst
 controls-position-bottom = Nederst
 controls-position-left = Vänster
 controls-position-right = Höger
+no-camera-available = Ingen kamera tillgänglig
+settings-demosaicing = Demosaikning
+settings-demosaicing-description = Algoritm som används för att återskapa färger i RAW-bilder
+insights-v4l2-in-backend = Tillgängligt i { $backend }
+insights-v4l2-active-in-backend = Aktiv i { $backend }
+insights-v4l2-not-in-backend = Inte tillgängligt i { $backend }
+insights-frame-copy-time = Kopieringstid för bildbuffert
+insights-preview-delivery-drops = Kameraförhandsvisningen hackar
+shutdown-pending-saves =
+    { $count ->
+        [0] Avslutar avstängning
+        [one] 1 foto/video väntar på att sparas
+       *[other] { $count } foton/videor väntar på att sparas
+    }
+settings-motion-photo = Rörligt foto
+motion-photo-error-title = Rörligt foto kunde inte sparas
+motion-photo-error-dismiss = Avfärda
+settings-motion-photo-description = Buffra kontinuerligt en kort video i minnet med den valda videokodaren. Spara JPEG/AVIF-bilder med 1,25 sekunder före och efter exponeringen. Funktionen är inte tillgänglig för PNG/DNG; ditt val sparas när du byter format.
+settings-audio-encoder-description = Gäller videoinspelningar endast. Rörliga foton använder alltid AAC, i enlighet med specifikationen för Android Motion Photo.

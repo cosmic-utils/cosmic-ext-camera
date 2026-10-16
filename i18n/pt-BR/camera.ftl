@@ -45,7 +45,7 @@ settings-video = Vídeo
 settings-device = Dispositivo
 settings-microphone = Microfone
 settings-record-audio = Gravar áudio
-settings-audio-encoder = Codificador de áudio
+settings-audio-encoder = Codificador de áudio e vídeo
 settings-mic-level = Nível do microfone
 settings-mic-level-initializing = Inicializando…
 settings-encoder = Codificador
@@ -299,3 +299,22 @@ settings-controls-position-description = Posicione os controles de captura na bo
 controls-position-bottom = Base
 controls-position-left = Esquerda
 controls-position-right = Direita
+no-camera-available = Nenhuma câmera disponível
+settings-demosaicing = Demosaicing
+settings-demosaicing-description = Algoritmo usado para reconstruir cores em fotos RAW
+insights-v4l2-in-backend = Disponível em { $backend }
+insights-v4l2-active-in-backend = Disponível em { $backend }
+insights-v4l2-not-in-backend = Não disponível em { $backend }
+insights-frame-copy-time = Tempo de cópia do buffer de quadros
+insights-preview-delivery-drops = Perda de quadros na pré-visualização
+shutdown-pending-saves =
+    { $count ->
+        [0] Finalizando o desligamento
+        [one] 1 foto/vídeo aguardando gravação
+       *[other] { $count } fotos/vídeos aguardando gravação
+    }
+settings-motion-photo = Fotografia em movimento
+motion-photo-error-title = A foto em movimento não pôde ser salva
+motion-photo-error-dismiss = Fechar
+settings-motion-photo-description = Mantém um breve vídeo em buffer contínuo na memória, utilizando o codificador de vídeo selecionado. Salva fotos nos formatos JPEG ou AVIF, capturando 1,25 segundos antes e depois do acionamento do obturador. Recurso não disponível para os formatos PNG ou DNG; sua preferência é mantida ao alternar entre os formatos.
+settings-audio-encoder-description = Aplica-se apenas a gravações de vídeo. Fotos em movimento sempre utilizam AAC, conforme exigido pela especificação de Motion Photo do Android.

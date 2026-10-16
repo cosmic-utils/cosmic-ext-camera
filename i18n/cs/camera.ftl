@@ -28,7 +28,7 @@ settings-video = Video
 settings-device = Zařízení
 settings-microphone = Mikrofon
 settings-record-audio = Nahrávat zvuk
-settings-audio-encoder = Enkodér zvuku
+settings-audio-encoder = Zvukový enkodér videa
 settings-encoder = Enkodér
 settings-quality = Kvalita
 settings-mirror-preview = Zrcadlit náhled
@@ -334,3 +334,23 @@ controls-position-left = Vlevo
 controls-position-bottom = Dole
 settings-controls-position = Umístění ovládacích prvků
 settings-controls-position-description = Umístění ovládacích prvků pro snímání na dolní, levý nebo pravý okraj. Při volbě levého nebo pravého okraje se záhlaví přesune na opačnou stranu, aniž by se otočil náhled kamery.
+no-camera-available = Není dostupná žádná kamera
+insights-v4l2-in-backend = Dostupné v { $backend }
+insights-v4l2-active-in-backend = Aktivní v { $backend }
+insights-v4l2-not-in-backend = Nedostupné v { $backend }
+settings-demosaicing-description = Algoritmus používaný k rekonstrukci barev ve fotografiích RAW
+insights-frame-copy-time = Doba kopírování obrazových dat
+insights-preview-delivery-drops = Zahozené snímky náhledu
+settings-demosaicing = Odmozaikování
+shutdown-pending-saves =
+    { $count ->
+        [0] Dokončuje se vypínání
+        [one] Zbývá uložit 1 fotografii/video
+        [few] Zbývá uložit { $count } fotografie/videa
+       *[other] Zbývá uložit { $count } fotografií/videí
+    }
+settings-motion-photo = Pohyblivá fotografie
+motion-photo-error-title = Pohyblivou fotografii se nepodařilo uložit
+motion-photo-error-dismiss = Zavřít
+settings-audio-encoder-description = Platí pouze pro záznam videa. Pohyblivé fotografie vždy používají AAC, jak vyžaduje specifikace Androidu pro pohyblivé fotografie.
+settings-motion-photo-description = Průběžně ukládá krátký videozáznam do vyrovnávací paměti pomocí vybraného video enkodéru. Fotografie ve formátu JPEG/AVIF se ukládají s 1.25 sekundy záznamu před stisknutím spouště a po něm. Tato funkce není dostupná pro formáty PNG/DNG; při přepnutí formátu zůstane vaše volba zachována.
