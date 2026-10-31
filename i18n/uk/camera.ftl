@@ -9,7 +9,7 @@ timelapse-saving = Обробка...
 mode-virtual = Віртуальна
 mode-view = Перегляд
 # Virtual camera
-virtual-camera-title = Віртуальна камера (експериментально)
+virtual-camera-title = Віртуальна камера (тест)
 virtual-camera-description = Транслюйте відеопотік камери до інших застосунків через віртуальний пристрій камери. Потрібен PipeWire.
 streaming-live = НАЖИВО
 virtual-camera-file-filter-name = Зображення та відео
@@ -131,7 +131,7 @@ hdr-plus-frames-50 = 50 кадрів
 settings-photo = Знімок
 settings-photo-format = Формат знімків
 settings-photo-format-description = Формати для збережених знімків. JPEG і AVIF (стиснений), PNG (без втрат якості), а DNG зберігає найбільше даних для подальшої обробки.
-settings-hdr-plus = HDR+ (експериментально)
+settings-hdr-plus = HDR+ (тест)
 settings-hdr-plus-description = Багатокадрова зйомка для кращих знімків при слабкому освітленні та ширшого динамічного діапазону. Авто підбирає кількість кадрів залежно від яскравості сцени.
 settings-save-burst-raw = Зберігати сирці серії
 settings-save-burst-raw-description = Зберігати окремі кадри серії у форматі DNG разом із HDR+ знімками. Корисно для налагодження або повторної обробки.
@@ -331,3 +331,21 @@ metainfo-feature-controls = Ручне керування: експозиція,
 metainfo-caption-photo-tools = Режим фото з панеллю інструментів
 metainfo-caption-phone = Режим знімку на Linux-телефоні
 tools-motor = Мотор
+settings-audio-encoder-description = Лише для відеозаписів. Рухомі знімки завжди у форматі AAC за вимогами Android Motion Photo.
+no-camera-available = Камери не знайдено
+settings-demosaicing-description = Алгоритм обробки сирих знімків
+insights-v4l2-in-backend = Доступно в { $backend }
+insights-v4l2-active-in-backend = Активно в { $backend }
+insights-v4l2-not-in-backend = Недоступно в { $backend }
+shutdown-pending-saves =
+    { $count ->
+        [0] Завершення роботи
+        [one] Збереження ще 1 файла
+        [few] Збереження ще { $count } файлів
+       *[other] Збереження ще { $count } файлів
+    }
+settings-motion-photo = Рухомі знімки
+settings-motion-photo-description = Безперервний запис короткого відео в пам'ять обраним відеокодувальником. Знімки JPEG і AVIF охоплюють 1,25 секунди до й після моменту зйомки. Недоступно для PNG і DNG, проте вибір зберігається під час перемикання форматів.
+insights-frame-copy-time = Час копіювання буфера кадру
+insights-preview-delivery-drops = Втрачені кадри перегляду
+settings-demosaicing = Відтворення кольору
