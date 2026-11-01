@@ -354,3 +354,22 @@ motion-photo-error-title = Pohyblivou fotografii se nepodařilo uložit
 motion-photo-error-dismiss = Zavřít
 settings-audio-encoder-description = Platí pouze pro záznam videa. Pohyblivé fotografie vždy používají AAC, jak vyžaduje specifikace Androidu pro pohyblivé fotografie.
 settings-motion-photo-description = Průběžně ukládá krátký videozáznam do vyrovnávací paměti pomocí vybraného video enkodéru. Fotografie ve formátu JPEG/AVIF se ukládají s 1.25 sekundy záznamu před stisknutím spouště a po něm. Tato funkce není dostupná pro formáty PNG/DNG; při přepnutí formátu zůstane vaše volba zachována.
+recording-error-dismiss = Zrušit
+toggle-flash-on = BLESK ZAPNUT
+toggle-flash-off = BLESK VYPNUT
+toggle-motion-on = POHYB ZAPNUT
+toggle-motion-off = POHYB VYPNUT
+toggle-hdr-on = HDR ZAPNUTO
+toggle-hdr-off = HDR VYPNUTO
+recording-error-automatic = Automatický enkodér videa
+recording-error-title = Enkodér videa selhal
+recording-error-body =
+    Enkodér videa „{ $encoder }“ selhal nebo přestal reagovat.
+
+    Restartujte zařízení. Před dalším zahájením nahrávání vyberte v nabídce Nastavení > Video jiný enkodér videa.
+
+    V případě hardwarových enkodérů se pravděpodobně jedná o chybu v linuxovém jádře nebo ovladači zařízení. Nahlaste prosím tento problém správcům svého zařízení a uveďte název enkodéru a podrobnosti o chybě.
+
+    Pořízený záznam může být neúplný.
+
+    Chyba: { $error }
