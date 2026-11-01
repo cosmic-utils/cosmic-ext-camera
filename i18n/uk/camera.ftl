@@ -349,3 +349,22 @@ settings-motion-photo-description = Безперервний запис коро
 insights-frame-copy-time = Час копіювання буфера кадру
 insights-preview-delivery-drops = Втрачені кадри перегляду
 settings-demosaicing = Відтворення кольору
+toggle-motion-on = РУХОМІ УВІМК.
+toggle-motion-off = РУХОМІ ВИМК.
+toggle-hdr-on = HDR УВІМКНЕНО
+toggle-hdr-off = HDR ВИМКНЕНО
+recording-error-title = Збій відеокодувальника
+recording-error-automatic = Типовий відеокодувальник
+recording-error-body =
+    Відеокодувальник «{ $encoder }» зазнав збою або не відповідає.
+
+    Перезавантажте пристрій. Перед записом виберіть інший відеокодувальник у Налаштування > Відео.
+
+    Для апаратних кодувальників це, найімовірніше, помилка ядра Linux або драйвера пристрою. Створіть звернення до техпідтримки пристрою із зазначенням назви кодувальника й деталей про збій.
+
+    Запис може бути неповним.
+
+    Помилка: { $error }
+recording-error-dismiss = Закрити
+toggle-flash-on = СПАЛАХ УВІМК.
+toggle-flash-off = СПАЛАХ ВИМК.
