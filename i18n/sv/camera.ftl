@@ -347,3 +347,22 @@ motion-photo-error-title = Rörligt foto kunde inte sparas
 motion-photo-error-dismiss = Avfärda
 settings-motion-photo-description = Buffra kontinuerligt en kort video i minnet med den valda videokodaren. Spara JPEG/AVIF-bilder med 1,25 sekunder före och efter exponeringen. Funktionen är inte tillgänglig för PNG/DNG; ditt val sparas när du byter format.
 settings-audio-encoder-description = Gäller videoinspelningar endast. Rörliga foton använder alltid AAC, i enlighet med specifikationen för Android Motion Photo.
+toggle-flash-on = BLIXT PÅ
+toggle-flash-off = BLIXT AV
+toggle-motion-on = RÖRELSE PÅ
+toggle-motion-off = RÖRELSE AV
+toggle-hdr-on = HDR PÅ
+toggle-hdr-off = HDR AV
+recording-error-title = Videoenkodern misslyckades
+recording-error-automatic = Automatisk videoenkoder
+recording-error-body =
+    Videoenkodern "{ $encoder }" misslyckades eller slutade svara.
+
+    Starta om din enhet. Efter omstart, välj en annan videoenkodare under Inställningar > Video innan du spelar in igen.
+
+    För hårdvarukodare är detta troligtvis en bugg i Linuxkärnan eller drivrutinen. Vänligen rapportera problemet till de ansvariga för din enhet och inkludera kodarens namn samt detaljer om felet.
+
+    Inspelningen kan vara ofullständig.
+
+    Fel: { $error }
+recording-error-dismiss = Avfärda
