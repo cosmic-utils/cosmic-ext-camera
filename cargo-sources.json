@@ -11940,14 +11940,14 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/zbus/zbus-6.1.0.crate",
-        "sha256": "fcff5faa63a63d5b81051740f7382017f10b3440b3f401d97f0cf0b3b39c62d9",
-        "dest": "cargo/vendor/zbus-6.1.0"
+        "url": "https://static.crates.io/crates/zbus/zbus-6.2.0.crate",
+        "sha256": "3666b126b788c05de810dd9e4e8dc84b21f87f7ad70a29a09b9db093f0102891",
+        "dest": "cargo/vendor/zbus-6.2.0"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"fcff5faa63a63d5b81051740f7382017f10b3440b3f401d97f0cf0b3b39c62d9\", \"files\": {}}",
-        "dest": "cargo/vendor/zbus-6.1.0",
+        "contents": "{\"package\": \"3666b126b788c05de810dd9e4e8dc84b21f87f7ad70a29a09b9db093f0102891\", \"files\": {}}",
+        "dest": "cargo/vendor/zbus-6.2.0",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -11992,14 +11992,14 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/zbus_macros/zbus_macros-6.1.0.crate",
-        "sha256": "5bba6e2bfe19571dc81b3e0be9f8daec6e5422db3e2eea2e766a859553e7bd37",
-        "dest": "cargo/vendor/zbus_macros-6.1.0"
+        "url": "https://static.crates.io/crates/zbus_macros/zbus_macros-6.2.1.crate",
+        "sha256": "083b38add47c340fc12ec560124fb1d9c23acb584f7021099f85ec6587a03c54",
+        "dest": "cargo/vendor/zbus_macros-6.2.1"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"5bba6e2bfe19571dc81b3e0be9f8daec6e5422db3e2eea2e766a859553e7bd37\", \"files\": {}}",
-        "dest": "cargo/vendor/zbus_macros-6.1.0",
+        "contents": "{\"package\": \"083b38add47c340fc12ec560124fb1d9c23acb584f7021099f85ec6587a03c54\", \"files\": {}}",
+        "dest": "cargo/vendor/zbus_macros-6.2.1",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -12018,14 +12018,14 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/zbus_utils/zbus_utils-6.0.0.crate",
-        "sha256": "c27a055b114bd9fc3686e90f62bd1fe612d523fc5f620bac3b1d2f42d3f6cab8",
-        "dest": "cargo/vendor/zbus_utils-6.0.0"
+        "url": "https://static.crates.io/crates/zbus_utils/zbus_utils-6.1.0.crate",
+        "sha256": "af55e52da295311b368c45bcae221f020e28e97a2420360170ce389218e76ec7",
+        "dest": "cargo/vendor/zbus_utils-6.1.0"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"c27a055b114bd9fc3686e90f62bd1fe612d523fc5f620bac3b1d2f42d3f6cab8\", \"files\": {}}",
-        "dest": "cargo/vendor/zbus_utils-6.0.0",
+        "contents": "{\"package\": \"af55e52da295311b368c45bcae221f020e28e97a2420360170ce389218e76ec7\", \"files\": {}}",
+        "dest": "cargo/vendor/zbus_utils-6.1.0",
         "dest-filename": ".cargo-checksum.json"
     },
     {
