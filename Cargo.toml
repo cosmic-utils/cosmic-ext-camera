@@ -118,3 +118,31 @@ opt-level = 1
 [dev-dependencies]
 log = "0.4.29"
 naga = { version = "30.0.0", features = ["wgsl-in"] }
+
+
+
+# ------------------------------------------------------------
+# Development overrides
+#
+# Uncomment the relevant patch entries when testing local
+# changes to libcosmic or libcamera-rs.
+#
+# Paths assume sibling checkouts:
+#   ~/git/cosmic-ext-camera/
+#   ~/git/libcosmic/
+#   ~/git/libcamera-rs/
+# ------------------------------------------------------------
+
+# Local libcosmic development
+#
+# [patch."https://github.com/pop-os/libcosmic"]
+# libcosmic = { path = "../libcosmic" }
+# iced_core = { path = "../libcosmic/iced/core" }
+# iced_wgpu = { path = "../libcosmic/iced/wgpu" }
+# iced_futures = { path = "../libcosmic/iced/futures" }
+
+# Local libcamera-rs development
+#
+# [patch.crates-io]
+# libcamera = { path = "../libcamera-rs/libcamera" }
+# libcamera-sys = { path = "../libcamera-rs/libcamera-sys" }
