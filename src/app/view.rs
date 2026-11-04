@@ -1143,16 +1143,22 @@ impl AppModel {
                 .width(Length::Fill)
                 .into()
         } else {
-            // Prime the slide even while recording hides the carousel. Both
-            // side controls follow the same geometry as their bottom-bar peers.
+            // Only prime while the carousel is absent. Otherwise its update
+            // owns the animated slide; resetting it during draw makes the
+            // bottom-bar buttons overlap the expanded carousel.
             let slide = std::sync::Arc::clone(&self.carousel_button_slide);
-            crate::app::bottom_bar::three_col_row(
-                SlideH::new(left, std::sync::Arc::clone(&slide), 1.0).into(),
+            let center = if self.bottom_bar_hidden() {
                 crate::app::bottom_bar::slide_h::SlidePrimer::new(
                     center,
                     std::sync::Arc::clone(&slide),
                 )
-                .into(),
+                .into()
+            } else {
+                center
+            };
+            crate::app::bottom_bar::three_col_row(
+                SlideH::new(left, std::sync::Arc::clone(&slide), 1.0).into(),
+                center,
                 SlideH::new(right, slide, -1.0).into(),
                 [spacing.space_xs, spacing.space_m],
             )
@@ -2395,6 +2401,95 @@ mod bar_insets_tests {
             Some("tiny-skia"),
         ))
         .expect("headless software renderer")
+    }
+
+    #[test]
+    fn idle_capture_row_preserves_expanded_carousel_button_slide() {
+        use cosmic::iced::advanced::Layout;
+        use std::sync::atomic::Ordering;
+
+        let mut renderer = renderer();
+        for orientation in [DisplayOrientation::Rotate0, DisplayOrientation::Rotate180] {
+            for width in [360.0, 800.0, 1920.0] {
+                let model = AppModel {
+                    display_orientation: orientation,
+                    screen_width: width,
+                    screen_height: 600.0,
+                    ..Default::default()
+                };
+                let mut element = model.build_capture_button();
+                let (tree, node) = crate::app::settings::widget_test_support::layout(
+                    &mut element,
+                    &renderer,
+                    Size::new(width, 160.0),
+                );
+                // The live carousel publishes an outward slide during full
+                // expansion. Drawing the shutter lane must not replace it
+                // with the collapsed position before the bottom bar draws.
+                let expanded_slide = -80.0_f32;
+                model
+                    .carousel_button_slide
+                    .store(expanded_slide.to_bits(), Ordering::Relaxed);
+                element.as_widget().draw(
+                    &tree,
+                    &mut renderer,
+                    &cosmic::theme::active(),
+                    &Default::default(),
+                    Layout::new(&node),
+                    cosmic::iced::mouse::Cursor::Unavailable,
+                    &cosmic::iced::Rectangle::with_size(Size::new(width, 600.0)),
+                );
+                assert_eq!(
+                    f32::from_bits(model.carousel_button_slide.load(Ordering::Relaxed)),
+                    expanded_slide,
+                    "{orientation:?}, width {width}: capture row reset the live carousel slide"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hidden_carousel_capture_row_still_primes_resting_button_slide() {
+        use cosmic::iced::advanced::Layout;
+        use std::sync::atomic::Ordering;
+
+        let mut renderer = renderer();
+        let model = AppModel {
+            photo_timer_countdown: Some(3),
+            screen_width: 800.0,
+            screen_height: 600.0,
+            ..Default::default()
+        };
+        assert!(model.bottom_bar_hidden());
+        let mut element = model.build_capture_row(
+            None,
+            widget::Space::new().width(40).height(40).into(),
+            widget::Space::new().into(),
+        );
+        let (tree, node) = crate::app::settings::widget_test_support::layout(
+            &mut element,
+            &renderer,
+            Size::new(800.0, 160.0),
+        );
+        let expected = crate::app::bottom_bar::mode_carousel::resting_button_slide(
+            node.children()[2].bounds(),
+        );
+        model
+            .carousel_button_slide
+            .store((-80.0_f32).to_bits(), Ordering::Relaxed);
+        element.as_widget().draw(
+            &tree,
+            &mut renderer,
+            &cosmic::theme::active(),
+            &Default::default(),
+            Layout::new(&node),
+            cosmic::iced::mouse::Cursor::Unavailable,
+            &cosmic::iced::Rectangle::with_size(Size::new(800.0, 600.0)),
+        );
+        assert_eq!(
+            f32::from_bits(model.carousel_button_slide.load(Ordering::Relaxed)),
+            expected
+        );
     }
 
     fn layout_widget(

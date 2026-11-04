@@ -65,6 +65,14 @@ pub fn three_col_row<'a>(
 }
 
 impl AppModel {
+    pub(super) fn bottom_bar_hidden(&self) -> bool {
+        self.recording.is_recording()
+            || self.quick_record.is_recording()
+            || self.timelapse.is_active()
+            || self.virtual_camera.is_streaming()
+            || self.photo_timer_countdown.is_some()
+    }
+
     /// Build the complete bottom bar widget
     ///
     /// Assembles gallery button, mode switcher, and camera switcher
@@ -75,11 +83,7 @@ impl AppModel {
     /// or a photo-timer countdown, the children are replaced with empty
     /// space of the same fixed height so the surrounding layout stays put.
     pub fn build_bottom_bar(&self) -> Element<'_, Message> {
-        let bar_hidden = self.recording.is_recording()
-            || self.quick_record.is_recording()
-            || self.timelapse.is_active()
-            || self.virtual_camera.is_streaming()
-            || self.photo_timer_countdown.is_some();
+        let bar_hidden = self.bottom_bar_hidden();
 
         let sideways = self.controls_are_sideways();
 
