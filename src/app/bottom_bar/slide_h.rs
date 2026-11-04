@@ -225,14 +225,13 @@ impl<'a> From<SlideH<'a>> for cosmic::Element<'a, Message> {
 /// Transparent wrapper that publishes the carousel's resting inward-slide into
 /// the shared atomic at draw time, derived from its child's on-screen bounds.
 ///
-/// The recording-state capture row mirrors the bottom bar's three-column shape,
+/// The capture row mirrors the bottom bar's three-column shape,
 /// so its center container occupies exactly the bounds the mode carousel would.
-/// During recording the carousel isn't in the widget tree, so nothing writes
-/// the shared slide atomic; wrapping the center container keeps the side
-/// `SlideH` buttons (the photo-during-recording button) at the correct offset
-/// instead of falling back to zero — a mismatch visible in preview screenshots
-/// that boot straight into an active recording. Layout and drawing are
-/// unchanged; only the atomic is updated as a side effect.
+/// While the carousel is visible, it uses a separate atomic so Toolbox stays
+/// at its resting offset instead of following the live carousel's expansion.
+/// During recording the carousel is absent, so the shared offset can be primed
+/// directly. Layout and drawing are unchanged; only the atomic is updated as a
+/// side effect.
 pub struct SlidePrimer<'a> {
     child: cosmic::Element<'a, Message>,
     slide_shared: Arc<AtomicU32>,

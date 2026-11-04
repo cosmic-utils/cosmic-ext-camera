@@ -1077,7 +1077,7 @@ impl AppModel {
     }
 
     /// Reuse the recording lane's slots for idle capture controls, keeping
-    /// Toolbox/photo capture aligned with the camera switcher in every rotation.
+    /// Toolbox/photo capture at the camera switcher's resting position in every rotation.
     pub(super) fn build_capture_row<'a>(
         &self,
         left: Option<Element<'a, Message>>,
@@ -1143,19 +1143,18 @@ impl AppModel {
                 .width(Length::Fill)
                 .into()
         } else {
-            // Only prime while the carousel is absent. Otherwise its update
-            // owns the animated slide; resetting it during draw makes the
-            // bottom-bar buttons overlap the expanded carousel.
-            let slide = std::sync::Arc::clone(&self.carousel_button_slide);
-            let center = if self.bottom_bar_hidden() {
-                crate::app::bottom_bar::slide_h::SlidePrimer::new(
-                    center,
-                    std::sync::Arc::clone(&slide),
-                )
-                .into()
+            // Capture-lane buttons keep their resting alignment, independently
+            // of the carousel's animated sibling-button offsets.
+            let slide = if self.bottom_bar_hidden() {
+                std::sync::Arc::clone(&self.carousel_button_slide)
             } else {
-                center
+                std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0))
             };
+            let center = crate::app::bottom_bar::slide_h::SlidePrimer::new(
+                center,
+                std::sync::Arc::clone(&slide),
+            )
+            .into();
             crate::app::bottom_bar::three_col_row(
                 SlideH::new(left, std::sync::Arc::clone(&slide), 1.0).into(),
                 center,
@@ -2410,6 +2409,58 @@ mod bar_insets_tests {
     }
 
     #[test]
+    fn toolbox_stays_at_its_resting_position_while_carousel_buttons_slide() {
+        use crate::app::settings::widget_test_support as ui;
+        use cosmic::iced::advanced::Layout;
+        use cosmic::iced::{Rectangle, Vector, mouse};
+        use std::sync::atomic::Ordering;
+
+        let mut renderer = renderer();
+        for orientation in [DisplayOrientation::Rotate0, DisplayOrientation::Rotate180] {
+            for width in [320.0, 800.0, 1920.0] {
+                let model = AppModel {
+                    display_orientation: orientation,
+                    screen_width: width,
+                    screen_height: 600.0,
+                    ..Default::default()
+                };
+                let mut element = model.build_capture_button();
+                let (mut tree, node) = ui::layout(&mut element, &renderer, Size::new(width, 160.0));
+                let resting_slide = crate::app::bottom_bar::mode_carousel::resting_button_slide(
+                    node.children()[2].bounds(),
+                );
+                let position =
+                    node.children()[4].bounds().center() - Vector::new(resting_slide, 0.0);
+                for slide in [resting_slide, 0.0, -80.0, resting_slide] {
+                    model
+                        .carousel_button_slide
+                        .store(slide.to_bits(), Ordering::Relaxed);
+                    element.as_widget().draw(
+                        &tree,
+                        &mut renderer,
+                        &cosmic::theme::active(),
+                        &Default::default(),
+                        Layout::new(&node),
+                        mouse::Cursor::Unavailable,
+                        &Rectangle::with_size(Size::new(width, 160.0)),
+                    );
+                    assert_eq!(
+                        f32::from_bits(model.carousel_button_slide.load(Ordering::Relaxed)),
+                        slide,
+                        "capture controls must not reset the carousel animation"
+                    );
+                    assert!(
+                        ui::click(&mut element, &mut tree, &node, &renderer, position)
+                            .iter()
+                            .any(|message| matches!(message, Message::ToggleToolsMenu)),
+                        "{orientation:?}, width {width}, slide {slide}: toolbox moved from {position:?}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn idle_capture_row_preserves_expanded_carousel_button_slide() {
         use cosmic::iced::advanced::Layout;
         use std::sync::atomic::Ordering;
@@ -2455,7 +2506,9 @@ mod bar_insets_tests {
     }
 
     #[test]
-    fn hidden_carousel_capture_row_still_primes_resting_button_slide() {
+    fn hidden_carousel_capture_row_keeps_photo_at_its_resting_position() {
+        use crate::app::settings::widget_test_support as ui;
+        use cosmic::iced::Vector;
         use cosmic::iced::advanced::Layout;
         use std::sync::atomic::Ordering;
 
@@ -2470,16 +2523,13 @@ mod bar_insets_tests {
         let mut element = model.build_capture_row(
             None,
             widget::Space::new().width(40).height(40).into(),
-            widget::Space::new().into(),
+            model.build_photo_during_recording_button(),
         );
-        let (tree, node) = crate::app::settings::widget_test_support::layout(
-            &mut element,
-            &renderer,
-            Size::new(800.0, 160.0),
-        );
+        let (mut tree, node) = ui::layout(&mut element, &renderer, Size::new(800.0, 160.0));
         let expected = crate::app::bottom_bar::mode_carousel::resting_button_slide(
             node.children()[2].bounds(),
         );
+        let position = node.children()[4].bounds().center() - Vector::new(expected, 0.0);
         model
             .carousel_button_slide
             .store((-80.0_f32).to_bits(), Ordering::Relaxed);
@@ -2495,6 +2545,11 @@ mod bar_insets_tests {
         assert_eq!(
             f32::from_bits(model.carousel_button_slide.load(Ordering::Relaxed)),
             expected
+        );
+        assert!(
+            ui::click(&mut element, &mut tree, &node, &renderer, position)
+                .iter()
+                .any(|message| matches!(message, Message::Capture))
         );
     }
 
