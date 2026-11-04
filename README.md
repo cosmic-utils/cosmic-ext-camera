@@ -224,13 +224,45 @@ just clippy
 just test
 ```
 
+### Dependency update policy
+
+Cargo and GitHub Actions updates are checked daily at 06:00 UTC. libcosmic
+and its Iced crates stay outside the grouped registry minor/patch updates;
+major upgrades remain separate PRs. Cargo uses the `auto` strategy: compatible
+releases update the lockfile; manifest requirements change when needed to allow
+a new release.
+The compiler pin in `rust-toolchain.toml` is shared by developers, CI and musl
+images; it is not a declaration of the minimum supported Rust version. Toolchain
+updates run Mondays at 06:15 UTC. Python build-tool updates run Mondays at 06:30
+UTC through `requirements-build.txt`, consumed by CI and the local uv/venv paths.
+After lockfile changes, run `just flatpak-cargo-sources`; its pinned generator is
+checksum-verified, replacing stale cached helpers before execution.
+
+The Flatpak runtime/SDK and llvm22 extension remain on 26.08. COSMIC BaseApp
+stable currently declares runtime 25.08, but only supplies icon data, a cleanup
+script and a static musl `just` binary, not runtime-linked libraries; retaining
+it does not mix native SDK libraries into the 26.08 build. Ubuntu CI and Flatpak
+retain source-pinned libcamera 0.7.2; Flatpak also retains its libyuv subproject
+and libpisp 1.3.0. Moving those source builds to libcamera 0.8/libpisp 1.7 needs
+separate native SDK and physical-device validation rather than silently changing
+camera pipeline/IPA behavior. Alpine edge musl images continue using distro SDK
+packages, which can advance independently; compilation is not physical camera
+validation. Flatpak's source-built Python tools
+are separate from the host generator environment; their offline archives and
+checksums remain intact. In particular, Jinja 3.1.6 requires `flit_core<4`, so
+its 3.12.0 backend is retained instead of the incompatible 4.x release. Preview
+image/package baselines are intentionally not
+updated, and Docker updates are not enabled in Dependabot. Cross is pinned to
+one revision in local instructions and CI. Architecture-specific GNU sysroots
+remain distinct; musl images both use Alpine edge and the canonical compiler.
+
 ### Cross-Compilation
 
 Cross-compilation for other architectures uses [cross](https://github.com/cross-rs/cross) with custom Dockerfiles in `docker/`.
 
 ```bash
 # Install cross
-cargo install cross --git https://github.com/cross-rs/cross
+cargo install cross --git https://github.com/cross-rs/cross --rev a9301e91f72bba3850460512685f6b16062015ff
 
 # Debug build
 cross build --target aarch64-unknown-linux-gnu

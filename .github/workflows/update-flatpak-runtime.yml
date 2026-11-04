@@ -16,7 +16,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Flatpak
         run: |
@@ -102,7 +102,7 @@ jobs:
 
       - name: Install just
         if: steps.check.outputs.update_available == 'true'
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       - name: Build updated Flatpak
         if: steps.check.outputs.update_available == 'true'
@@ -114,7 +114,7 @@ jobs:
       - name: Create Pull Request
         id: cpr
         if: steps.check.outputs.update_available == 'true'
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "deps(flatpak): update runtime to ${{ steps.check.outputs.latest }}"

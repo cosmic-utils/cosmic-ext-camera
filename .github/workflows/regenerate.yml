@@ -16,6 +16,8 @@ on:
     branches: [main]
     paths:
       - 'Cargo.lock'
+      - 'requirements-build.txt'
+      - 'justfile'
       - 'i18n/**'
       - 'scripts/gen-metadata.py'
   workflow_dispatch:
@@ -36,18 +38,18 @@ jobs:
         # Fetch Git LFS objects (the committed preview screenshots).
         # LFS download bandwidth is billed to the repository owner even for public repos:
         # https://docs.github.com/en/billing/managing-billing-for-git-large-file-storage/about-billing-for-git-large-file-storage
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           lfs: true
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y appstream desktop-file-utils
-          pip install aiohttp toml tomlkit
+          python3 -m pip install --requirement requirements-build.txt
 
       - name: Regenerate derived files
         run: just generate

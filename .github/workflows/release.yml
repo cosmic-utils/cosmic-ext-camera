@@ -44,15 +44,19 @@ jobs:
             use_cross: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
 
+      - name: Read Rust toolchain
+        id: toolchain
+        run: python3 -c 'import tomllib; print("version=" + tomllib.load(open("rust-toolchain.toml", "rb"))["toolchain"]["channel"])' >> "$GITHUB_OUTPUT"
+
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
-          toolchain: 1.98.0
+          toolchain: ${{ steps.toolchain.outputs.version }}
           targets: ${{ matrix.target }}
 
       - name: Set up native dependencies and libcamera 0.7.2 (native build)
@@ -61,22 +65,21 @@ jobs:
 
       - name: Install cross
         if: ${{ matrix.use_cross }}
-        run: cargo install cross --git https://github.com/cross-rs/cross
+        run: cargo install cross --git https://github.com/cross-rs/cross --rev a9301e91f72bba3850460512685f6b16062015ff
 
       - name: Install and verify podman
         if: ${{ matrix.use_cross }}
         run: bash scripts/ci-oci-probe.sh
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       - name: Build release binary
         env:
           CROSS_CONTAINER_ENGINE: podman
         run: |
           if [ "${{ matrix.use_cross }}" = "true" ]; then
-            CROSS_BUILD_OPTS="--build-arg RUST_VERSION=$(rustc -V | cut -d' ' -f2)" \
-              cross build --release --target ${{ matrix.target }}
+            cross build --release --target ${{ matrix.target }}
           else
             just build-release --target ${{ matrix.target }}
           fi
@@ -90,7 +93,7 @@ jobs:
           rm camera
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: binary-${{ matrix.arch }}
           path: dist/camera-${{ matrix.arch }}-linux.tar.gz
@@ -102,7 +105,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -116,7 +119,7 @@ jobs:
         run: sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       - name: Install Flatpak dependencies
         run: just flatpak-deps x86_64
@@ -125,7 +128,7 @@ jobs:
         run: just flatpak-bundle x86_64
 
       - name: Upload Flatpak artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flatpak-x86_64
           path: camera-x86_64.flatpak
@@ -140,7 +143,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.build_aarch64_flatpak
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -151,7 +154,7 @@ jobs:
           sudo apt-get install -y flatpak flatpak-builder
 
       - name: Set up QEMU for multi-arch builds
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
         with:
           platforms: arm64
 
@@ -159,7 +162,7 @@ jobs:
         run: sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Install just
-        uses: extractions/setup-just@v4
+        uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4
 
       - name: Install Flatpak dependencies
         run: just flatpak-deps aarch64
@@ -168,7 +171,7 @@ jobs:
         run: just flatpak-bundle aarch64
 
       - name: Upload Flatpak artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: flatpak-aarch64
           path: camera-aarch64.flatpak
@@ -185,13 +188,13 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
 
