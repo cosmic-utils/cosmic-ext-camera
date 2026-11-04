@@ -59,7 +59,7 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.version }}
           targets: ${{ matrix.target }}
 
-      - name: Set up native dependencies and libcamera 0.7.2 (native build)
+      - name: Set up native dependencies and libcamera 0.8.0 (native build)
         if: ${{ !matrix.use_cross }}
         run: bash scripts/ci-native-setup.sh
 

@@ -61,7 +61,7 @@ wayland-client = "0.31.15"
 dng = "1.6.0"
 async-stream = "0.3.6"
 # Native libcamera bindings for direct camera access (bypasses GStreamer)
-libcamera = "0.7.0"
+libcamera = "0.8.0"
 drm-fourcc = "2.2.0"
 turbojpeg = { version = "1.5.1", default-features = false, features = ["cmake"] }
 little_exif = "0.6.23"
@@ -119,6 +119,11 @@ opt-level = 1
 log = "0.4.35"
 naga = { version = "30.0.1", features = ["wgsl-in"] }
 
+# Use the 0.8.0 bindings, including the matching low-level C++ bridge.
+[patch.crates-io]
+libcamera = { git = "https://github.com/FreddyFunk/libcamera-rs.git", branch = "feature/0.8.0" }
+libcamera-sys = { git = "https://github.com/FreddyFunk/libcamera-rs.git", branch = "feature/0.8.0" }
+
 
 
 # ------------------------------------------------------------
@@ -143,6 +148,6 @@ naga = { version = "30.0.1", features = ["wgsl-in"] }
 
 # Local libcamera-rs development
 #
-# [patch.crates-io]
+# Replace the entries in [patch.crates-io] above for local development:
 # libcamera = { path = "../libcamera-rs/libcamera" }
 # libcamera-sys = { path = "../libcamera-rs/libcamera-sys" }

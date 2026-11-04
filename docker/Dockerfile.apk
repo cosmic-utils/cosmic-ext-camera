@@ -14,7 +14,6 @@ RUN apk add --no-cache \
     gst-plugins-base-dev \
     gstreamer-dev \
     just \
-    libcamera-dev \
     libinput-dev \
     libseat-dev \
     libxkbcommon-dev \
@@ -34,3 +33,8 @@ RUN adduser -D builder && \
         [ -d "$d" ] && cp "$d"/*.rsa.pub /etc/apk/keys/ || true; \
     done && \
     ls /etc/apk/keys/*.rsa.pub
+
+# Minimal native SDK APKs; keep the same key used for the Camera package.
+COPY docker/build-libcamera-apk.sh /opt/camera/docker/build-libcamera-apk.sh
+COPY docker/libcamera/APKBUILD /opt/camera/docker/libcamera/APKBUILD
+RUN sh /opt/camera/docker/build-libcamera-apk.sh

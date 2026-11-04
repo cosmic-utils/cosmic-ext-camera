@@ -12,7 +12,10 @@ depends="
 	gst-plugins-bad
 	gst-plugins-base
 	gst-plugins-good
+	libcamera>=0.8.0
 	libdav1d
+	so:libcamera.so.0.8
+	so:libcamera-base.so.0.8
 "
 
 build() { :; }

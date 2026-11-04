@@ -15,6 +15,7 @@ depends="
 	gst-plugins-bad
 	gst-plugins-base
 	gst-plugins-good
+	libcamera>=0.8.0
 	libdav1d
 "
 makedepends="
@@ -27,7 +28,7 @@ makedepends="
 	gst-plugins-base-dev
 	gstreamer-dev
 	just
-	libcamera-dev
+	libcamera-dev>=0.8.0
 	libjpeg-turbo-dev
 	libxkbcommon-dev
 	nasm

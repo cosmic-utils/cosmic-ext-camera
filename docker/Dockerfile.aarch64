@@ -1,16 +1,16 @@
 # Cross-compilation image for aarch64-unknown-linux-gnu
-FROM ubuntu:25.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Configure apt sources: amd64 from archive.ubuntu.com, aarch64 (arm64) from ports.ubuntu.com
 RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources && \
-    echo 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky main universe' > /etc/apt/sources.list && \
-    echo 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky-updates main universe' >> /etc/apt/sources.list && \
-    echo 'deb [arch=amd64] http://security.ubuntu.com/ubuntu plucky-security main universe' >> /etc/apt/sources.list && \
-    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky main universe' >> /etc/apt/sources.list && \
-    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-updates main universe' >> /etc/apt/sources.list && \
-    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports plucky-security main universe' >> /etc/apt/sources.list
+    echo 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble main universe' > /etc/apt/sources.list && \
+    echo 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-updates main universe' >> /etc/apt/sources.list && \
+    echo 'deb [arch=amd64] http://security.ubuntu.com/ubuntu noble-security main universe' >> /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble main universe' >> /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-updates main universe' >> /etc/apt/sources.list && \
+    echo 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports noble-security main universe' >> /etc/apt/sources.list
 
 # Install base tools (before adding aarch64 architecture)
 # Note: libglib2.0-dev-bin must be installed here (amd64) to prevent
@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     nasm \
     libglib2.0-dev-bin \
     libclang-dev \
+    git meson ninja-build python3-jinja2 python3-yaml python3-ply \
     && rm -rf /var/lib/apt/lists/*
 
 # Add aarch64 architecture and install cross-compilation toolchain and dependencies
@@ -32,7 +33,7 @@ RUN dpkg --add-architecture arm64 && \
     apt-get update && apt-get install -y \
     gcc-aarch64-linux-gnu \
     g++-aarch64-linux-gnu \
-    libcamera-dev:arm64 \
+    libyaml-dev:arm64 \
     libdav1d-dev:arm64 \
     libglib2.0-dev:arm64 \
     libgstreamer1.0-dev:arm64 \
@@ -44,6 +45,10 @@ RUN dpkg --add-architecture arm64 && \
     libudev-dev:arm64 \
     libseat-dev:arm64 \
     && rm -rf /var/lib/apt/lists/*
+
+# Build target libcamera rather than using Ubuntu's older distro ABI.
+COPY docker/build-libcamera.sh /usr/local/bin/build-libcamera.sh
+RUN sh /usr/local/bin/build-libcamera.sh aarch64-linux-gnu
 
 # Set up environment for cross-compilation
 ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \

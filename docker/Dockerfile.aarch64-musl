@@ -13,7 +13,8 @@ RUN apk add --no-cache \
     curl \
     lld \
     nasm \
-    pkgconf
+    pkgconf \
+    git meson samurai py3-jinja2 py3-yaml py3-ply linux-headers openssl llvm
 
 # Install Rust natively (musl-linked) so cargo runs without glibc.
 # Copy the canonical compiler pin, also invalidating the image layer on updates.
@@ -41,7 +42,8 @@ RUN mkdir -p /aarch64-sysroot/etc/apk && \
         libinput-dev \
         eudev-dev \
         libseat-dev \
-        libcamera-dev
+        linux-headers \
+        yaml-dev
 
 # Create symlinks so both aarch64-unknown-linux-musl (Rust's triple) and
 # aarch64-alpine-linux-musl (Alpine's GCC triple) resolve to the same directories.
@@ -68,6 +70,10 @@ RUN printf '#!/bin/sh\nUSE_LLD="-fuse-ld=lld"\nfor arg in "$@"; do case "$arg" i
     printf '#!/bin/sh\nUSE_LLD="-fuse-ld=lld"\nfor arg in "$@"; do case "$arg" in -c|-E|-S|-M|-MM) USE_LLD=""; break;; esac; done\nexec clang++ --target=aarch64-alpine-linux-musl --sysroot=/aarch64-sysroot --gcc-toolchain=/aarch64-sysroot/usr $USE_LLD "$@"\n' \
         > /usr/local/bin/aarch64-linux-musl-clang++ && \
     chmod +x /usr/local/bin/aarch64-linux-musl-clang++
+
+# Cross-build directly into the target sysroot with its musl headers/libraries.
+COPY docker/build-libcamera.sh /usr/local/bin/build-libcamera.sh
+RUN sh /usr/local/bin/build-libcamera.sh aarch64-linux-musl /aarch64-sysroot
 
 # Wrap rustc to add -C target-feature=-crt-static for host (build script) compilations.
 # Rustup installs statically-linked musl binaries, and build scripts compiled as static
