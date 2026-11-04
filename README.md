@@ -228,7 +228,9 @@ just test
 
 Cargo and GitHub Actions updates are checked daily at 06:00 UTC. libcosmic
 and its Iced crates stay outside the grouped registry minor/patch updates;
-major upgrades remain separate PRs. Cargo updates increase manifest requirements.
+major upgrades remain separate PRs. Cargo uses the `auto` strategy: compatible
+releases update the lockfile; manifest requirements change when needed to allow
+a new release.
 The compiler pin in `rust-toolchain.toml` is shared by developers, CI and musl
 images; it is not a declaration of the minimum supported Rust version. Toolchain
 updates run Mondays at 06:15 UTC. Python build-tool updates run Mondays at 06:30
