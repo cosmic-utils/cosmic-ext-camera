@@ -86,7 +86,6 @@ struct RecorderRecipe {
     dimensions: (u32, u32),
     crop: Option<(u32, u32, u32, u32)>,
     filter: crate::app::FilterType,
-    zoom: f32,
     rotation: SensorRotation,
     mirror: bool,
     encoder: String,
@@ -441,7 +440,6 @@ impl AppModel {
             dimensions: (width, height),
             crop: snapshot.crop(width, height, false),
             filter: snapshot.filter,
-            zoom: snapshot.zoom,
             rotation: snapshot.media_rotation,
             mirror: snapshot.mirror,
             encoder: info.element_name.clone(),
@@ -480,7 +478,6 @@ impl AppModel {
         let processing = PostProcessingConfig {
             filter_type: recipe.filter,
             crop_rect: recipe.crop,
-            zoom_level: recipe.zoom,
             ..Default::default()
         };
         let draining = Arc::new(AtomicBool::new(false));
@@ -488,6 +485,7 @@ impl AppModel {
         let postroll_requests = Arc::new(AtomicUsize::new(0));
         let job_cancel = cancel.clone();
         let job_source_cancel = source_cancel.clone();
+        let live_zoom = self.zoom_control.clone();
         let bitrate = recipe.bitrate;
         let fps = recipe.fps;
         let audio = recipe.audio.clone();
@@ -510,6 +508,7 @@ impl AppModel {
                     frames,
                     shutters,
                     processing,
+                    live_zoom,
                     rotation,
                     mirror,
                     info,
@@ -669,15 +668,15 @@ fn continuous_processor(processing: PostProcessingConfig) -> PostProcessor {
 async fn process_clip_frame(
     processor: &PostProcessor,
     frame: Arc<CameraFrame>,
+    desired_zoom: f32,
     dimensions: &mut Option<(u32, u32)>,
     rotation: SensorRotation,
     mirror: bool,
 ) -> Result<image::RgbImage, String> {
-    let processed = processor.process(frame).await?;
-    // Completed native crops can increase the available pixel count without
-    // changing the desired field of view. Lock source-space encoder geometry
-    // once; resample the entire residual crop, never crop it a second time.
-    let target = *dimensions.get_or_insert(processed.image.dimensions());
+    let target = *dimensions.get_or_insert((frame.width, frame.height));
+    let processed = processor.process_with_zoom(frame, desired_zoom).await?;
+    // Zoom changes framing, never encoder resolution. Resample the entire
+    // residual crop back to the unzoomed aspect region, then orient it.
     let image = if processed.image.dimensions() == target {
         processed.image
     } else {
@@ -707,6 +706,7 @@ fn run_memory_recorder(
     frames: std::sync::mpsc::Receiver<Arc<CameraFrame>>,
     shutters: std::sync::mpsc::Receiver<ShutterRequest>,
     processing: PostProcessingConfig,
+    live_zoom: Arc<crate::backends::camera::zoom::ZoomControl>,
     rotation: SensorRotation,
     mirror: bool,
     info: EncoderInfo,
@@ -733,8 +733,10 @@ fn run_memory_recorder(
             return;
         }
     };
+    let mut clip_dimensions = processing
+        .crop_rect
+        .map(|(_, _, width, height)| (width, height));
     let processor = continuous_processor(processing);
-    let mut clip_dimensions = None;
     let mut encoder: Option<MemoryEncoder> = None;
     let mut pending: Vec<ShutterRequest> = Vec::new();
     let mut failure: Option<String> = None;
@@ -839,7 +841,14 @@ fn run_memory_recorder(
         let processed = runtime.block_on(async {
             tokio::time::timeout(
                 PROCESSING_TIMEOUT,
-                process_clip_frame(&processor, frame, &mut clip_dimensions, rotation, mirror),
+                process_clip_frame(
+                    &processor,
+                    frame,
+                    live_zoom.zoom(),
+                    &mut clip_dimensions,
+                    rotation,
+                    mirror,
+                ),
             )
             .await
         });

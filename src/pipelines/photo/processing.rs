@@ -121,6 +121,16 @@ impl PostProcessor {
     /// * `Ok(ProcessedImage)` - Processed RGB image
     /// * `Err(String)` - Error message
     pub async fn process(&self, frame: Arc<CameraFrame>) -> Result<ProcessedImage, String> {
+        self.process_with_zoom(frame, self.config.zoom_level).await
+    }
+
+    /// Override total zoom for one continuous frame without changing the aspect
+    /// crop, filter or rendering policy. Stills retain their snapshotted zoom.
+    pub(crate) async fn process_with_zoom(
+        &self,
+        frame: Arc<CameraFrame>,
+        desired_zoom: f32,
+    ) -> Result<ProcessedImage, String> {
         info!(
             width = frame.width,
             height = frame.height,
@@ -138,7 +148,7 @@ impl PostProcessor {
         )
         .map_err(|e| e.to_string())?;
         let mut config = self.config.clone();
-        config.zoom_level = crate::backends::camera::zoom::residual_zoom(config.zoom_level, &frame);
+        config.zoom_level = crate::backends::camera::zoom::residual_zoom(desired_zoom, &frame);
         let frame_width = frame.width;
         let frame_height = frame.height;
         let compact_rgba = match frame.format {
