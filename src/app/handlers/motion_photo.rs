@@ -65,21 +65,19 @@ impl MotionPhotoSnapshot {
                 self.ratio.display_ratio(self.portrait),
             )
         };
-        let (mut x, mut y, mut w, mut h) = crate::app::preview_geometry::inverse_oriented_crop(
+        let crop = crate::app::preview_geometry::inverse_oriented_crop(
             crop,
             width,
             height,
             self.geometry_rotation,
         );
-        if include_zoom && self.zoom > 1.0 {
-            let zw = ((w as f32 / self.zoom).round() as u32).max(1);
-            let zh = ((h as f32 / self.zoom).round() as u32).max(1);
-            x += (w - zw) / 2;
-            y += (h - zh) / 2;
-            w = zw;
-            h = zh;
-        }
-        ((x, y, w, h) != (0, 0, width, height)).then_some((x, y, w, h))
+        let config = PostProcessingConfig {
+            crop_rect: Some(crop),
+            zoom_level: if include_zoom { self.zoom } else { 1.0 },
+            ..Default::default()
+        };
+        let region = PostProcessor::final_region(width, height, &config).ok()?;
+        (region != (0, 0, width, height)).then_some(region)
     }
 }
 
@@ -206,6 +204,7 @@ impl AppModel {
         cosmic::Task::none()
     }
 
+    #[cfg(test)]
     pub(crate) fn motion_photo_burst_crop(
         &self,
         width: u32,
@@ -214,6 +213,20 @@ impl AppModel {
         self.motion_photo_capture
             .as_ref()
             .and_then(|live| live.snapshot.crop(width, height, true))
+    }
+
+    /// Crop a burst frame using the shutter recipe and that frame's ISP evidence.
+    pub(crate) fn motion_photo_burst_frame_crop(
+        &self,
+        frame: &CameraFrame,
+    ) -> Option<(u32, u32, u32, u32)> {
+        self.motion_photo_capture.as_ref().and_then(|live| {
+            // Keep the stored shutter zoom total: RAW and processed frames can
+            // coexist, and only the latter have a completed crop baked in.
+            let mut snapshot = live.snapshot.clone();
+            snapshot.zoom = crate::backends::camera::zoom::residual_zoom(snapshot.zoom, frame);
+            snapshot.crop(frame.width, frame.height, true)
+        })
     }
 
     /// Snapshot settings once, before any photo path branches.
@@ -315,7 +328,7 @@ impl AppModel {
             photo_output_format: self.config.photo_output_format,
             camera_metadata: self.build_camera_metadata(),
             filter: self.selected_filter,
-            zoom: self.zoom_level,
+            zoom: self.current_zoom_level(),
             media_rotation: self.capture_media_rotation(),
             mirror: self.should_mirror_captures(),
             geometry_rotation: self.capture_geometry_rotation(),
@@ -652,6 +665,32 @@ fn continuous_processor(processing: PostProcessingConfig) -> PostProcessor {
         .without_gpu_pacing()
 }
 
+/// Process in source coordinates, then orient for the encoder.
+async fn process_clip_frame(
+    processor: &PostProcessor,
+    frame: Arc<CameraFrame>,
+    dimensions: &mut Option<(u32, u32)>,
+    rotation: SensorRotation,
+    mirror: bool,
+) -> Result<image::RgbImage, String> {
+    let processed = processor.process(frame).await?;
+    // Completed native crops can increase the available pixel count without
+    // changing the desired field of view. Lock source-space encoder geometry
+    // once; resample the entire residual crop, never crop it a second time.
+    let target = *dimensions.get_or_insert(processed.image.dimensions());
+    let image = if processed.image.dimensions() == target {
+        processed.image
+    } else {
+        image::imageops::resize(
+            &processed.image,
+            target.0,
+            target.1,
+            image::imageops::FilterType::Triangle,
+        )
+    };
+    Ok(orient_clip_frame(image, rotation, mirror))
+}
+
 struct WorkerCompletion(RecordingMonitor);
 impl Drop for WorkerCompletion {
     fn drop(&mut self) {
@@ -695,6 +734,7 @@ fn run_memory_recorder(
         }
     };
     let processor = continuous_processor(processing);
+    let mut clip_dimensions = None;
     let mut encoder: Option<MemoryEncoder> = None;
     let mut pending: Vec<ShutterRequest> = Vec::new();
     let mut failure: Option<String> = None;
@@ -797,10 +837,14 @@ fn run_memory_recorder(
             continue;
         }
         let processed = runtime.block_on(async {
-            tokio::time::timeout(PROCESSING_TIMEOUT, processor.process(frame)).await
+            tokio::time::timeout(
+                PROCESSING_TIMEOUT,
+                process_clip_frame(&processor, frame, &mut clip_dimensions, rotation, mirror),
+            )
+            .await
         });
         let image = match processed {
-            Ok(Ok(p)) => orient_clip_frame(p.image, rotation, mirror),
+            Ok(Ok(image)) => image,
             Ok(Err(e)) => {
                 monitor.report_error(e.clone());
                 failure = Some(e);
@@ -850,6 +894,10 @@ fn run_memory_recorder(
         let _ = p.result.send(Err("Motion Photo recorder stopped".into()));
     }
 }
+
+#[cfg(test)]
+#[path = "motion_photo_zoom_tests.rs"]
+mod zoom_tests;
 
 #[cfg(test)]
 #[path = "motion_photo_pacing_tests.rs"]

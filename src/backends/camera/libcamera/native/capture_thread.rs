@@ -11,6 +11,7 @@ use super::diagnostics::{
     PREVIEW_FRAME_COUNT, STILL_FRAME_COUNT, StreamDiag, publish_diagnostics,
 };
 use super::pixel_formats::{map_pixel_format, pixel_format_name};
+use super::scaler_crop::NativeScalerCrop;
 use crate::backends::camera::preview_metrics::PreviewMetrics;
 use crate::backends::camera::still_capture::{StillCapture, StillTicket};
 use crate::backends::camera::types::*;
@@ -26,6 +27,7 @@ const CAPTURE_COPY_POOL_CACHE_CAPACITY: usize =
 
 /// Parameters passed to the capture thread for initialization
 pub(crate) struct CaptureThreadParams {
+    pub(crate) zoom: Arc<crate::backends::camera::zoom::ZoomControl>,
     pub(crate) camera_id: String,
     pub(crate) preview_metrics: Arc<PreviewMetrics>,
     pub(crate) preview_width: u32,
@@ -351,9 +353,13 @@ fn alloc_optional_buffers(
 /// Requeue a completed request, warning on failure unless stop is requested.
 fn requeue_request(
     cam: &mut libcamera::camera::ActiveCamera,
-    req: libcamera::request::Request,
+    mut req: libcamera::request::Request,
     stop_flag: &AtomicBool,
+    zoom: &crate::backends::camera::zoom::ZoomControl,
+    scaler_crop: &mut NativeScalerCrop,
 ) {
+    // Request::reuse clears controls. Reapply even when resetting to 1x.
+    scaler_crop.apply(req.controls_mut(), zoom);
     if let Err((_, e)) = cam.queue_request(req)
         && !stop_flag.load(Ordering::Acquire)
     {
@@ -711,6 +717,12 @@ fn capture_thread_setup_and_run(
     let (config, is_multistream) = configure_streams(&cam, &mut active_cam, &params)?;
 
     let formats = read_stream_formats(&config, is_multistream);
+    let mut scaler_crop = NativeScalerCrop::discover(
+        &cam,
+        formats.vf_pixel_format.is_bayer(),
+        formats.vf_size.width,
+        formats.vf_size.height,
+    );
 
     info!(
         vf_format = %formats.vf_format_name,
@@ -759,7 +771,8 @@ fn capture_thread_setup_and_run(
     crate::startup::milestone("camera_hardware_started");
 
     // Queue all requests
-    for req in requests {
+    for mut req in requests {
+        scaler_crop.apply(req.controls_mut(), &params.zoom);
         if let Err((_, e)) = active_cam.queue_request(req) {
             error!(error = %e, "Failed to queue initial request");
         }
@@ -839,6 +852,7 @@ fn capture_thread_setup_and_run(
         &formats,
         is_multistream,
         jpeg_decode_queue,
+        &mut scaler_crop,
         &mut params,
     );
 
@@ -1074,6 +1088,7 @@ fn run_capture_loop(
     formats: &StreamFormats,
     is_multistream: bool,
     jpeg_decode_queue: Option<MjpegDecodeQueue>,
+    scaler_crop: &mut NativeScalerCrop,
     params: &mut CaptureThreadParams,
 ) {
     use libcamera::framebuffer::AsFrameBuffer;
@@ -1114,7 +1129,13 @@ fn run_capture_loop(
         if req.status() != RequestStatus::Complete {
             debug!(status = ?req.status(), "Skipping non-complete request");
             req.reuse(ReuseFlag::REUSE_BUFFERS);
-            requeue_request(active_cam, req, &params.stop_flag);
+            requeue_request(
+                active_cam,
+                req,
+                &params.stop_flag,
+                &params.zoom,
+                scaler_crop,
+            );
             continue;
         }
 
@@ -1123,10 +1144,15 @@ fn run_capture_loop(
 
         // Extract per-frame metadata
         let mut metadata = extract_metadata(&req);
+        metadata.scaler_zoom = scaler_crop.completed(req.metadata());
         metadata.raw_layout = normal_raw_layout(&formats.vf_format_name);
 
         // Process viewfinder buffer
-        if let Some(vf_buf) = req.buffer::<MmapFB>(stream_vf) {
+        if !scaler_crop.may_dispatch_processed(metadata.scaler_zoom) {
+            // Do not software-crop pixels whose ISP crop cannot be verified.
+            // RAW still handling below remains independent and can still run.
+            params.preview_metrics.record_drops(1);
+        } else if let Some(vf_buf) = req.buffer::<MmapFB>(stream_vf) {
             // Extract kernel buffer timestamp (CLOCK_BOOTTIME ns) for video recording PTS
             let sensor_timestamp_ns = vf_buf.metadata().map(|m| m.timestamp());
             let planes = vf_buf.data();
@@ -1152,7 +1178,13 @@ fn run_capture_loop(
                 // Skip frames with no data (e.g. first frame from some UVC cameras)
                 if !preview_data_available(total_bytes_used, &params.preview_metrics) {
                     req.reuse(ReuseFlag::REUSE_BUFFERS);
-                    requeue_request(active_cam, req, &params.stop_flag);
+                    requeue_request(
+                        active_cam,
+                        req,
+                        &params.stop_flag,
+                        &params.zoom,
+                        scaler_crop,
+                    );
                     continue;
                 }
 
@@ -1241,8 +1273,8 @@ fn run_capture_loop(
             && let Some(sr) = stream_raw
         {
             let raw_pf = formats.raw_pixel_format.unwrap_or(PixelFormat::BayerRGGB);
-            let mut raw_metadata = metadata.clone();
-            raw_metadata.raw_layout = normal_raw_layout(&formats.raw_format_name);
+            let raw_metadata =
+                raw_frame_metadata(&metadata, normal_raw_layout(&formats.raw_format_name));
             if let Some(still_frame) = process_buffer(
                 &req,
                 sr,
@@ -1277,7 +1309,13 @@ fn run_capture_loop(
 
         // Reuse request and re-queue
         req.reuse(ReuseFlag::REUSE_BUFFERS);
-        requeue_request(active_cam, req, &params.stop_flag);
+        requeue_request(
+            active_cam,
+            req,
+            &params.stop_flag,
+            &params.zoom,
+            scaler_crop,
+        );
     }
 
     // Stop and join decode workers, then release completed outputs that retain
@@ -1369,7 +1407,15 @@ fn normal_sensor_black_levels(levels: libcamera::controls::SensorBlackLevels) ->
     levels.0.map(|n| n as f32 / 65535.0)
 }
 
-/// Extract per-frame metadata from a completed request
+/// RAW pixels never inherit the processed stream's ISP crop evidence.
+fn raw_frame_metadata(metadata: &FrameMetadata, layout: Option<RawLayout>) -> FrameMetadata {
+    let mut raw = metadata.clone();
+    raw.raw_layout = layout;
+    raw.scaler_zoom = None;
+    raw
+}
+
+/// Extract per-frame metadata from a completed request.
 fn extract_metadata(req: &libcamera::request::Request) -> FrameMetadata {
     use libcamera::controls;
     let meta = req.metadata();
@@ -1399,6 +1445,7 @@ fn extract_metadata(req: &libcamera::request::Request) -> FrameMetadata {
             .get::<controls::ColourCorrectionMatrix>()
             .ok()
             .map(|v| v.0),
+        scaler_zoom: None,
         raw_layout: None,
         // The standard libcamera 0.7 API provides no documented WhiteLevel
         // control. Do not guess vendor IDs or substitute a calibration value.
@@ -1637,6 +1684,48 @@ fn compute_stride(pf: PixelFormat, width: u32, buffer_size: usize, height: u32) 
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn raw_frame_metadata_never_inherits_processed_scaler_crop() {
+        use crate::backends::camera::zoom::{ScalerCropBounds, ZoomRect};
+        let base = ZoomRect {
+            x: 0,
+            y: 0,
+            width: 4000,
+            height: 3000,
+        };
+        let bounds = ScalerCropBounds::new(
+            ZoomRect {
+                width: 100,
+                height: 100,
+                ..base
+            },
+            base,
+            base,
+            base,
+            false,
+        )
+        .unwrap();
+        let original = super::FrameMetadata {
+            scaler_zoom: bounds.applied(Some(ZoomRect {
+                x: 1000,
+                y: 750,
+                width: 2000,
+                height: 1500,
+            })),
+            exposure_time: Some(1000),
+            ..Default::default()
+        };
+        let raw =
+            super::raw_frame_metadata(&original, Some(super::RawLayout::Unpacked16 { bits: 10 }));
+        assert!(raw.scaler_zoom.is_none());
+        assert_eq!(raw.exposure_time, Some(1000));
+        assert_eq!(
+            raw.raw_layout,
+            Some(super::RawLayout::Unpacked16 { bits: 10 })
+        );
+        assert!(original.scaler_zoom.is_some());
+    }
+
     use super::{
         BoundedWorkerQueue, QueueWorker, advance_mjpeg_dispatch_watermark, drain_pending_events,
         pooled_copy_frame_planes, snapshot_frame_dispatch_context,
@@ -1922,6 +2011,7 @@ mod tests {
         preview_metrics: Arc<super::PreviewMetrics>,
     ) -> super::CaptureThreadParams {
         super::CaptureThreadParams {
+            zoom: Default::default(),
             camera_id: "native-dispatch-metrics-test".into(),
             preview_metrics,
             preview_width: 2,

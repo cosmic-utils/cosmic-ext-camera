@@ -20,6 +20,7 @@ pub mod types;
 mod usb_name;
 pub mod v4l2_controls;
 pub mod v4l2_utils;
+pub mod zoom;
 
 pub use recording::RecordingBridge;
 pub use types::*;

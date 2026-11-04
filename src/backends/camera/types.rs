@@ -675,6 +675,8 @@ pub(crate) fn validate_bayer_levels(
 /// as reported by libcamera. Only populated when using the libcamera backend.
 #[derive(Debug, Clone, Default)]
 pub struct FrameMetadata {
+    /// Applied ISP crop evidence; never populated for RAW pixels.
+    pub scaler_zoom: Option<super::zoom::FrameScalerZoom>,
     /// Negotiated source packing, not inferred from row padding. Unknown stays None.
     pub raw_layout: Option<RawLayout>,
     /// Per-site [R, Gr, Gb, B] black levels in normalized 16-bit control units.

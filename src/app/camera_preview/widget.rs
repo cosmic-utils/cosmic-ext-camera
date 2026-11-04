@@ -160,7 +160,7 @@ impl AppModel {
         };
 
         let zoom_level = transforms.zoom;
-        let scroll_zoom_enabled = self.mode.supports_fit_and_zoom();
+        let scroll_zoom_enabled = true;
 
         // The colour the blur chain's transform pass fills the letterbox with.
         //
@@ -482,6 +482,59 @@ mod tests {
         };
         m.config.mirror_preview = true;
         m
+    }
+
+    #[test]
+    fn zoom_gestures_are_available_in_every_camera_mode() {
+        let mut m = model();
+        for mode in CameraMode::ALL {
+            m.mode = mode;
+            let config = m.preview_video_config(VIDEO_ID_NORMAL, None).unwrap();
+            assert!(config.scroll_zoom_enabled, "zoom disabled in {mode:?}");
+        }
+    }
+
+    #[test]
+    fn zoom_gestures_update_the_capture_mailbox_in_video_mode() {
+        let mut m = model();
+        m.mode = CameraMode::Video;
+        let _ = m.handle_pinch_zoom(3.0);
+        assert_eq!(m.zoom_control.zoom(), 3.0);
+        let _ = m.handle_zoom_out();
+        assert_eq!(m.zoom_control.zoom(), m.zoom_level);
+    }
+
+    #[test]
+    fn preview_removes_only_the_zoom_already_applied_to_this_frame() {
+        use crate::backends::camera::types::FrameMetadata;
+        use crate::backends::camera::zoom::{ScalerCropBounds, ZoomRect};
+        let base = ZoomRect {
+            x: 100,
+            y: 200,
+            width: 4000,
+            height: 3000,
+        };
+        let minimum = ZoomRect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+        };
+        let bounds = ScalerCropBounds::new(minimum, base, base, base, false).unwrap();
+        let applied = bounds.applied(Some(bounds.crop(2.0))).unwrap();
+        let mut m = model();
+        let frame = Arc::make_mut(m.current_frame.as_mut().unwrap());
+        frame.libcamera_metadata = Some(FrameMetadata {
+            scaler_zoom: Some(applied),
+            ..Default::default()
+        });
+        let frame = m.current_frame.as_ref().unwrap();
+        let config = m.preview_video_config(VIDEO_ID_NORMAL, None).unwrap();
+        assert_eq!(config.zoom_level, 2.0, "gestures retain total zoom");
+        assert_eq!(config.primitive(VIDEO_ID_NORMAL, frame).zoom_level, 1.0);
+        m.zoom_level = 4.0;
+        let config = m.preview_video_config(VIDEO_ID_NORMAL, None).unwrap();
+        assert_eq!(config.primitive(VIDEO_ID_NORMAL, frame).zoom_level, 2.0);
     }
 
     /// Nothing blurring: the preview renders LIVE state, so there is no frozen

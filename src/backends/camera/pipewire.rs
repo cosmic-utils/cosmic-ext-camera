@@ -950,6 +950,7 @@ mod tests {
         let (frame_sender, receiver) = futures::channel::mpsc::channel(1);
         (
             PipelineSharedState {
+                zoom: Default::default(),
                 frame_sender,
                 still_capture: Default::default(),
                 recording_sender: Arc::new(Mutex::new(None)),

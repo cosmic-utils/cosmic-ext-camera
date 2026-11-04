@@ -93,7 +93,9 @@ impl VideoWidgetConfig {
         primitive.mirror_horizontal = self.mirror_horizontal;
         primitive.rotation = self.rotation;
         primitive.crop_uv = self.crop_uv;
-        primitive.zoom_level = self.zoom_level;
+        // Gesture state remains total magnification; only the part not
+        // already baked into THIS frame belongs in the rendering shader.
+        primitive.zoom_level = crate::backends::camera::zoom::residual_zoom(self.zoom_level, frame);
         primitive.letterbox_color = self.letterbox_color;
 
         if let Some(frame) = VideoFrame::from_camera_frame(video_id, frame) {

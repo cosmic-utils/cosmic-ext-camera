@@ -396,6 +396,8 @@ pub struct BurstModeState {
     pub target_frame_count: usize,
     /// Photo algorithm snapshotted when the burst starts, not when processing begins.
     pub demosaic_method: crate::shaders::DemosaicMethod,
+    /// Total zoom snapshotted at shutter time, independent of later controls.
+    pub(crate) capture_zoom: f32,
     /// Shared atomic for processing progress updates (progress * 1000 for 0.1% precision)
     /// Only present during Processing stage
     progress_atomic: Option<Arc<std::sync::atomic::AtomicU32>>,
@@ -425,6 +427,24 @@ impl BurstModeState {
     ///
     /// Returns `true` if the target frame count has been reached.
     pub fn add_frame(&mut self, frame: Arc<CameraFrame>) -> bool {
+        if !crate::backends::camera::zoom::frame_can_represent_zoom(self.capture_zoom, &frame) {
+            return false;
+        }
+        let geometry = |frame: &CameraFrame| {
+            frame
+                .libcamera_metadata
+                .as_ref()
+                .and_then(|m| m.scaler_zoom)
+        };
+        if self
+            .frame_buffer
+            .first()
+            .is_some_and(|first| geometry(first) != geometry(&frame))
+        {
+            // An ISP crop can take several requests to settle. Start the
+            // burst at the new geometry rather than align different FOVs.
+            self.frame_buffer.clear();
+        }
         self.frame_buffer.push(frame);
         self.frame_buffer.len() >= self.target_frame_count
     }
@@ -573,6 +593,7 @@ impl Default for BurstModeState {
             frame_buffer: Vec::new(),
             target_frame_count: 8, // Will be overwritten when capture starts
             demosaic_method: crate::shaders::DemosaicMethod::default(),
+            capture_zoom: 1.0,
             progress_atomic: None,
             result_rx: None,
         }
@@ -770,6 +791,9 @@ pub struct AppModel {
     pub photo_aspect_ratio: PhotoAspectRatio,
     /// Current (settled) zoom level (1.0 = no zoom, 2.0 = 2x zoom, etc.)
     pub zoom_level: f32,
+    /// Desired camera/encoder zoom. Applied ScalerCrop belongs to each frame,
+    /// not to this shared request mailbox.
+    pub(crate) zoom_control: Arc<crate::backends::camera::zoom::ZoomControl>,
     /// In-flight zoom transition, or `None` when settled on `zoom_level`.
     /// Set by the zoom-reset button; pinch / step zoom set `zoom_level`
     /// directly and clear this so they remain real-time.

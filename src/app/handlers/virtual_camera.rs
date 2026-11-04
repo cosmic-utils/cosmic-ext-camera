@@ -14,6 +14,7 @@ use tracing::{debug, error, info, warn};
 
 /// Parameters for video file streaming to virtual camera
 struct VideoStreamParams<'a> {
+    zoom_control: Arc<crate::backends::camera::zoom::ZoomControl>,
     initial_filter: FilterType,
     filter_rx: &'a mut tokio::sync::watch::Receiver<FilterType>,
     stop_rx: tokio::sync::oneshot::Receiver<()>,
@@ -23,6 +24,31 @@ struct VideoStreamParams<'a> {
     control_rx: tokio::sync::mpsc::UnboundedReceiver<VideoPlaybackCommand>,
     initial_seek_position: f64,
     initial_paused: bool,
+}
+
+// Keep output preparation separate from preview ownership: callers retain the source.
+async fn virtual_output_frame<'a>(
+    frame: &'a crate::backends::camera::types::CameraFrame,
+    zoom: &crate::backends::camera::zoom::ZoomControl,
+) -> Result<std::borrow::Cow<'a, crate::backends::camera::types::CameraFrame>, String> {
+    use crate::backends::camera::types::{CameraFrame, FrameData, PixelFormat};
+    let desired = zoom.zoom();
+    // Native processed frames may already contain all requested zoom. Keep the
+    // original RGBA push fast path, including its stride, in that case.
+    if frame.format == PixelFormat::RGBA
+        && crate::backends::camera::zoom::residual_zoom(desired, frame) <= 1.0
+    {
+        return Ok(std::borrow::Cow::Borrowed(frame));
+    }
+    let rgba =
+        crate::pipelines::video::recorder::convert_frame_to_zoomed_rgba(frame, desired).await?;
+    Ok(std::borrow::Cow::Owned(CameraFrame {
+        data: FrameData::from_owned_vec(rgba),
+        format: PixelFormat::RGBA,
+        stride: frame.width * 4,
+        yuv_planes: None,
+        ..frame.clone()
+    }))
 }
 
 impl AppModel {
@@ -78,6 +104,7 @@ impl AppModel {
         let width = format.width;
         let height = format.height;
         let filter_type = self.selected_filter;
+        let zoom_control = Arc::clone(&self.zoom_control);
 
         info!(
             width,
@@ -100,7 +127,6 @@ impl AppModel {
 
         // Spawn the dedicated thread immediately (fire-and-forget from thread perspective)
         std::thread::spawn(move || {
-            use crate::backends::camera::types::{CameraFrame, FrameData, PixelFormat};
             use crate::backends::virtual_camera::VirtualCameraManager;
 
             // Create and start the virtual camera on this dedicated thread
@@ -178,36 +204,14 @@ impl AppModel {
                         );
                     }
 
-                    // If the camera delivered YUV (or any non-RGBA format),
-                    // run it through the shared GPU convert pipeline to get
-                    // tightly-packed RGBA that the virtual-camera appsrc
-                    // expects. Skip the round-trip when the frame is
-                    // already RGBA.
-                    let push_result = if latest_frame.format == PixelFormat::RGBA {
-                        manager.push_frame(&latest_frame)
-                    } else {
-                        match rt.block_on(crate::pipelines::video::recorder::convert_frame_to_rgba(
-                            &latest_frame,
-                        )) {
-                            Ok(rgba) => {
-                                let rgba_arc: std::sync::Arc<[u8]> = rgba.into();
-                                let rgba_frame = CameraFrame {
-                                    width: latest_frame.width,
-                                    height: latest_frame.height,
-                                    data: FrameData::from_copied(rgba_arc),
-                                    format: PixelFormat::RGBA,
-                                    stride: latest_frame.width * 4,
-                                    yuv_planes: None,
-                                    captured_at: latest_frame.captured_at,
-                                    sensor_timestamp_ns: latest_frame.sensor_timestamp_ns,
-                                    libcamera_metadata: latest_frame.libcamera_metadata.clone(),
-                                };
-                                manager.push_frame(&rgba_frame)
-                            }
-                            Err(e) => {
-                                warn!(?e, format = ?latest_frame.format, "YUV→RGBA convert failed; dropping frame");
-                                continue;
-                            }
+                    // Convert non-RGBA and apply only source-aware residual zoom.
+                    let push_result = match rt
+                        .block_on(virtual_output_frame(&latest_frame, &zoom_control))
+                    {
+                        Ok(output) => manager.push_frame(&output),
+                        Err(e) => {
+                            warn!(?e, format = ?latest_frame.format, "Virtual output conversion failed; dropping frame");
+                            continue;
                         }
                     };
                     if let Err(e) = push_result {
@@ -254,6 +258,7 @@ impl AppModel {
         self.stop_video_preview_playback();
 
         let filter_type = self.selected_filter;
+        let zoom_control = Arc::clone(&self.zoom_control);
         let is_video = matches!(file_source, FileSource::Video(_));
 
         info!(
@@ -313,10 +318,12 @@ impl AppModel {
                     &mut filter_rx,
                     stop_rx,
                     preview_tx,
+                    zoom_control,
                 ),
                 FileSource::Video(path) => Self::stream_video_to_virtual_camera(
                     &path,
                     VideoStreamParams {
+                        zoom_control,
                         initial_filter: filter_type,
                         filter_rx: &mut filter_rx,
                         stop_rx,
@@ -369,6 +376,7 @@ impl AppModel {
         preview_tx: tokio::sync::mpsc::UnboundedSender<
             Arc<crate::backends::camera::types::CameraFrame>,
         >,
+        zoom_control: Arc<crate::backends::camera::zoom::ZoomControl>,
     ) -> Result<(), String> {
         use crate::backends::virtual_camera::{VirtualCameraManager, load_image_as_frame};
 
@@ -386,6 +394,10 @@ impl AppModel {
         // doesn't apply here. Pin `flip_horizontal` to `false` defensively so
         // a future change to the default can't silently start mirroring
         // streamed images to consumer apps.
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| format!("Failed to create virtual-cam runtime: {}", e))?;
         let mut manager = VirtualCameraManager::new();
         manager.set_filter(initial_filter);
 
@@ -422,7 +434,10 @@ impl AppModel {
 
             // Push the frame to virtual camera (file sources are never mirrored - they
             // display content as-is, unlike camera selfie preview which mirrors)
-            if let Err(e) = manager.push_frame(&frame_arc) {
+            if let Err(e) = rt.block_on(async {
+                let output = virtual_output_frame(&frame_arc, &zoom_control).await?;
+                manager.push_frame(&output).map_err(|e| e.to_string())
+            }) {
                 warn!(?e, "Failed to push frame to virtual camera");
             }
 
@@ -450,6 +465,7 @@ impl AppModel {
         params: VideoStreamParams<'_>,
     ) -> Result<(), String> {
         let VideoStreamParams {
+            zoom_control,
             initial_filter,
             filter_rx,
             mut stop_rx,
@@ -480,6 +496,10 @@ impl AppModel {
         // doesn't apply here. Pin `flip_horizontal` to `false` defensively so
         // a future change to the default can't silently start mirroring
         // streamed video files to consumer apps.
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|e| format!("Failed to create virtual-cam runtime: {}", e))?;
         let mut manager = VirtualCameraManager::new();
         manager.set_filter(initial_filter);
 
@@ -505,7 +525,10 @@ impl AppModel {
         let mut last_frame: Option<Arc<crate::backends::camera::types::CameraFrame>> = None;
         if let Some(preroll) = decoder.preroll_frame() {
             let frame_arc = Arc::new(preroll);
-            if let Err(e) = manager.push_frame(&frame_arc) {
+            if let Err(e) = rt.block_on(async {
+                let output = virtual_output_frame(&frame_arc, &zoom_control).await?;
+                manager.push_frame(&output).map_err(|e| e.to_string())
+            }) {
                 warn!(?e, "Failed to push preroll frame to virtual camera");
             }
             let _ = preview_tx.send(Arc::clone(&frame_arc));
@@ -592,7 +615,10 @@ impl AppModel {
             // virtual-camera pipeline's input.
             if paused && !needs_frame_update {
                 if let Some(ref frame_arc) = last_frame
-                    && let Err(e) = manager.push_frame(frame_arc)
+                    && let Err(e) = rt.block_on(async {
+                        let output = virtual_output_frame(frame_arc, &zoom_control).await?;
+                        manager.push_frame(&output).map_err(|e| e.to_string())
+                    })
                 {
                     warn!(?e, "Failed to re-push paused frame to virtual camera");
                 }
@@ -613,7 +639,10 @@ impl AppModel {
 
                     // Push to virtual camera (file sources are never mirrored - they
                     // display content as-is, unlike camera selfie preview which mirrors)
-                    if let Err(e) = manager.push_frame(&frame_arc) {
+                    if let Err(e) = rt.block_on(async {
+                        let output = virtual_output_frame(&frame_arc, &zoom_control).await?;
+                        manager.push_frame(&output).map_err(|e| e.to_string())
+                    }) {
                         warn!(?e, "Failed to push frame to virtual camera");
                     }
 
@@ -1258,5 +1287,121 @@ impl AppModel {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod zoom_tests {
+    use super::virtual_output_frame;
+    use crate::backends::camera::types::{CameraFrame, FrameData, PixelFormat};
+    use crate::backends::camera::zoom::ZoomControl;
+
+    fn source_frame() -> CameraFrame {
+        let data: Vec<u8> = (0..8)
+            .flat_map(|_| (0..8).flat_map(|x| [x * 30, 0, 0, 255]))
+            .collect();
+        CameraFrame {
+            width: 8,
+            height: 8,
+            stride: 32,
+            format: PixelFormat::RGBA,
+            data: FrameData::from_owned_vec(data),
+            yuv_planes: None,
+            captured_at: std::time::Instant::now(),
+            sensor_timestamp_ns: Some(42),
+            libcamera_metadata: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn paused_file_source_reads_live_zoom_without_accumulating_or_changing_preview() {
+        let source = source_frame();
+        let original = source.data.to_vec();
+        let zoom = ZoomControl::default();
+        let first = virtual_output_frame(&source, &zoom).await.unwrap();
+        assert!(std::ptr::eq(first.as_ref(), &source));
+        zoom.set_zoom(2.0);
+        let second = virtual_output_frame(&source, &zoom).await.unwrap();
+        assert_ne!(
+            &*second.data,
+            original.as_slice(),
+            "virtual output must follow zoom changes while reusing a paused source"
+        );
+        assert_eq!((second.width, second.height, second.stride), (8, 8, 32));
+        assert_eq!(second.sensor_timestamp_ns, source.sensor_timestamp_ns);
+        assert_eq!(second.captured_at, source.captured_at);
+        let repeated = virtual_output_frame(&source, &zoom).await.unwrap();
+        assert_eq!(&*repeated.data, &*second.data);
+        assert_eq!(
+            &*source.data,
+            original.as_slice(),
+            "preview source must remain unzoomed"
+        );
+        zoom.set_zoom(1.0);
+        let restored = virtual_output_frame(&source, &zoom).await.unwrap();
+        assert!(std::ptr::eq(restored.as_ref(), &source));
+        assert_eq!(&*restored.data, original.as_slice());
+    }
+
+    fn native_frame() -> CameraFrame {
+        use crate::backends::camera::types::FrameMetadata;
+        use crate::backends::camera::zoom::{ScalerCropBounds, ZoomRect};
+        let base = ZoomRect {
+            x: 0,
+            y: 0,
+            width: 800,
+            height: 800,
+        };
+        let crop = ZoomRect {
+            x: 200,
+            y: 200,
+            width: 400,
+            height: 400,
+        };
+        let min = ZoomRect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+        };
+        let applied = ScalerCropBounds::new(min, base, base, base, false)
+            .unwrap()
+            .applied(Some(crop));
+        let mut frame = source_frame();
+        frame.libcamera_metadata = Some(FrameMetadata {
+            scaler_zoom: applied,
+            ..Default::default()
+        });
+        frame
+    }
+
+    #[tokio::test]
+    async fn native_applied_zoom_preserves_original_rgba_fast_path() {
+        let frame = native_frame();
+        let zoom = ZoomControl::default();
+        zoom.set_zoom(2.0);
+        let output = virtual_output_frame(&frame, &zoom).await.unwrap();
+        assert!(
+            std::ptr::eq(output.as_ref(), &frame),
+            "already baked native zoom must not crop twice"
+        );
+    }
+
+    #[tokio::test]
+    async fn partial_native_zoom_matches_software_residual_at_fixed_dimensions() {
+        let native = native_frame();
+        let file = source_frame();
+        let native_zoom = ZoomControl::default();
+        native_zoom.set_zoom(4.0);
+        let file_zoom = ZoomControl::default();
+        file_zoom.set_zoom(2.0);
+        let native_output = virtual_output_frame(&native, &native_zoom).await.unwrap();
+        let file_output = virtual_output_frame(&file, &file_zoom).await.unwrap();
+        assert_ne!(&*native_output.data, &*native.data);
+        assert_eq!(&*native_output.data, &*file_output.data);
+        assert_eq!(
+            (native_output.width, native_output.height),
+            (native.width, native.height)
+        );
     }
 }
