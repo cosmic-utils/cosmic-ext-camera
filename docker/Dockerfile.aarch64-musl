@@ -16,10 +16,11 @@ RUN apk add --no-cache \
     pkgconf
 
 # Install Rust natively (musl-linked) so cargo runs without glibc.
-# RUST_VERSION is passed as a build arg to keep the image in sync with the host
-# toolchain and to bust Docker's layer cache when the version changes.
-ARG RUST_VERSION=stable
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+# Copy the canonical compiler pin, also invalidating the image layer on updates.
+COPY rust-toolchain.toml /tmp/rust-toolchain.toml
+RUN apk add --no-cache python3 && \
+    RUST_VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("/tmp/rust-toolchain.toml", "rb"))["toolchain"]["channel"])') && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- -y --default-toolchain "${RUST_VERSION}" --target aarch64-unknown-linux-musl
 
 # Set up aarch64 musl sysroot with Alpine aarch64 packages

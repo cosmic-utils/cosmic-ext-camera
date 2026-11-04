@@ -11,7 +11,7 @@ use cosmic::widget::canvas;
 /// Semi-transparent white, 40% opacity
 const LINE_COLOR: Color = Color::from_rgba(1.0, 1.0, 1.0, 0.4);
 const LINE_WIDTH: f32 = 1.5;
-const PHI: f32 = 1.618_034;
+const PHI: f32 = std::f32::consts::GOLDEN_RATIO;
 
 /// Inputs needed to compute the visible-video rectangle at draw time. The
 /// rect depends on the canvas bounds (only known in `draw`), so we pass the
@@ -330,6 +330,12 @@ pub fn composition_canvas<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn golden_ratio_preserves_existing_guide_geometry() {
+        // Exact f32 representation of the previous 1.618_034 literal.
+        assert_eq!(PHI.to_bits(), 0x3fcf_1bbd);
+    }
 
     #[test]
     fn guides_preserve_framing_origins_rotations_and_fit_interpolation() {

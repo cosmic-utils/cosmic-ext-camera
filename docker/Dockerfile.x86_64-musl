@@ -27,8 +27,10 @@ RUN apk add --no-cache \
 # Install Rust via rustup rather than Alpine's native packages. Alpine edge
 # patches rustc with a different ABI fingerprint that causes compilation
 # failures with crates.io packages (e.g. serde_core prelude errors).
-ARG RUST_VERSION=stable
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+COPY rust-toolchain.toml /tmp/rust-toolchain.toml
+RUN apk add --no-cache python3 && \
+    RUST_VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("/tmp/rust-toolchain.toml", "rb"))["toolchain"]["channel"])') && \
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- -y --default-toolchain "${RUST_VERSION}" --target x86_64-unknown-linux-musl
 
 # Wrap rustc to add -C target-feature=-crt-static for host (build script) compilations.

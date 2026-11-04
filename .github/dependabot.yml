@@ -5,21 +5,21 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+      time: "06:00"
+      timezone: "UTC"
+    versioning-strategy: "increase"
     commit-message:
       prefix: "deps(cargo)"
     open-pull-requests-limit: 10
     groups:
-      # Group all crates from the pop-os/libcosmic git source into one PR
-      libcosmic:
-        patterns:
-          - "libcosmic"
-          - "iced_core"
-          - "iced_futures"
-          - "iced_wgpu"
-      # Group minor and patch updates together
+      # Keep libcosmic and its Iced crates outside the registry dependency group.
+      # Major upgrades remain individual PRs.
       rust-dependencies:
         patterns:
           - "*"
+        exclude-patterns:
+          - "libcosmic"
+          - "iced_*"
         update-types:
           - "minor"
           - "patch"
@@ -29,5 +29,36 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+      time: "06:00"
+      timezone: "UTC"
     commit-message:
       prefix: "deps(actions)"
+
+  # rust-toolchain.toml is the compiler-version source for CI and musl images.
+  - package-ecosystem: "rust-toolchain"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:15"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps(toolchain)"
+
+  # Shared Python dependencies used by local and CI build tooling.
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "UTC"
+    commit-message:
+      prefix: "deps(build)"
+    groups:
+      python-build-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
