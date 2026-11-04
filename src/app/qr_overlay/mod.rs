@@ -44,9 +44,11 @@ const BUTTON_GAP: f32 = 8.0;
 /// preview endpoints by `cover_blend` so the boxes track the live preview
 /// through a fit/fill transition.
 ///
-/// `top_bar_h` / `bottom_bar_h` are the animated UI bar heights — in Contain
-/// mode the video is letterboxed inside the content area between them, so
-/// those values are needed to know where the visible video actually sits.
+/// `insets` reserve the animated UI bars in Contain mode. `residual_zoom`
+/// must match the preview shader: compute it from total animated zoom and
+/// the displayed frame's completed-request metadata using `zoom::residual_zoom`.
+/// Native ScalerCrop is already baked into detection source pixels.
+#[allow(clippy::too_many_arguments)]
 pub fn build_qr_overlay<'a>(
     detections: &[QrDetection],
     frame_width: u32,
@@ -55,6 +57,7 @@ pub fn build_qr_overlay<'a>(
     insets: BarInsets,
     rotation: SensorRotation,
     mirrored: bool,
+    residual_zoom: f32,
 ) -> Element<'a, Message> {
     if detections.is_empty() {
         return cosmic::widget::Space::new()
@@ -71,6 +74,7 @@ pub fn build_qr_overlay<'a>(
         insets,
         rotation,
         mirrored,
+        residual_zoom,
     )
     .into()
 }
@@ -216,6 +220,7 @@ fn transform_region(
 }
 
 /// Transform normalized QR detection coordinates to screen coordinates
+#[allow(clippy::too_many_arguments)]
 pub fn transform_detection_to_screen(
     detection: &QrDetection,
     offset_x: f32,
@@ -224,8 +229,22 @@ pub fn transform_detection_to_screen(
     video_height: f32,
     rotation: SensorRotation,
     mirrored: bool,
+    residual_zoom: f32,
 ) -> (f32, f32, f32, f32) {
     let (nx, ny, nw, nh) = transform_region(&detection.bounds, rotation, mirrored);
+    // The source pixels already include completed-request native zoom. Apply
+    // only the shader's remaining centered digital crop, never total zoom.
+    let zoom = if residual_zoom.is_finite() {
+        residual_zoom.max(1.0)
+    } else {
+        1.0
+    };
+    let (nx, ny, nw, nh) = (
+        (nx - 0.5) * zoom + 0.5,
+        (ny - 0.5) * zoom + 0.5,
+        nw * zoom,
+        nh * zoom,
+    );
 
     // Scale from normalized (0-1) to video pixel coordinates
     let x = nx * video_width;
@@ -253,6 +272,36 @@ mod tests {
     use super::*;
     use crate::app::preview_geometry::BarInsets;
     use crate::backends::camera::types::SensorRotation;
+
+    #[test]
+    fn residual_zoom_doubles_frame_geometry_about_video_center() {
+        let detection = QrDetection::new(
+            FrameRegion {
+                x: 0.4,
+                y: 0.3,
+                width: 0.2,
+                height: 0.25,
+            },
+            "zoom".into(),
+        );
+        let actual = transform_detection_to_screen(
+            &detection,
+            20.0,
+            30.0,
+            1000.0,
+            800.0,
+            SensorRotation::None,
+            false,
+            2.0,
+        );
+        let expected = (320.0, 110.0, 400.0, 400.0);
+        for (actual, expected) in [actual.0, actual.1, actual.2, actual.3]
+            .into_iter()
+            .zip([expected.0, expected.1, expected.2, expected.3])
+        {
+            assert!((actual - expected).abs() < 0.001, "{actual} != {expected}");
+        }
+    }
 
     #[test]
     fn contain_bounds_reserve_side_bars() {

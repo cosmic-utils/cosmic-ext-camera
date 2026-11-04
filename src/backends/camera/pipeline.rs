@@ -68,6 +68,7 @@ mod tests {
         let ticket = still.pending().unwrap();
         assert!(still.publish(ticket, frame));
         let shared = PipelineSharedState {
+            zoom: Default::default(),
             frame_sender: tx,
             still_capture: still.clone(),
             recording_sender: Arc::new(Mutex::new(None)),

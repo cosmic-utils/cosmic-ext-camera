@@ -371,6 +371,7 @@ pub fn record_video(
                     },
                     pixel_format,
                     live_filter_code: std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0)),
+                    live_zoom: Default::default(),
                 },
                 frame_rx,
             )

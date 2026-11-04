@@ -291,6 +291,16 @@ impl AppModel {
         &mut self,
         frame: Arc<crate::backends::camera::types::CameraFrame>,
     ) -> Task<cosmic::Action<Message>> {
+        // The old frame is already retained for the frozen transition blur.
+        // Queued frames from that source must not reach any live consumer.
+        if self
+            .transition_state
+            .transition_start_time
+            .is_some_and(|start| frame.captured_at < start)
+        {
+            debug!("Dropping stale frame captured before camera/mode switch");
+            return Task::none();
+        }
         if self.pending_close {
             // Feed accepted post-roll / HDR acquisition only, never the view,
             // QR detection, virtual output or new control discovery.
@@ -351,18 +361,6 @@ impl AppModel {
         // Recording frames are sent directly from the capture thread via
         // set_recording_sender (bypasses UI for lower latency / fewer drops).
 
-        // Drop stale frames from the old camera/mode that were already queued
-        // in the iced message queue when the switch happened — but only AFTER
-        // the transition blur has ended. During the blur period we want stale
-        // frames so the blurred old-camera image remains visible.
-        if !self.transition_state.in_transition
-            && let Some(transition_start) = self.transition_state.transition_start_time
-            && frame.captured_at < transition_start
-        {
-            debug!("Dropping stale frame captured before camera/mode switch");
-            return Task::none();
-        }
-
         // File-source eligibility must be known before forwarding any frame.
         let is_file_source = self.virtual_camera.is_file_source();
         self.current_frame_is_file_source = is_file_source;
@@ -411,6 +409,21 @@ impl AppModel {
         // The last frame before processing started remains displayed with blur effect.
         if self.burst_mode.stage == crate::app::state::BurstModeStage::Processing {
             return Task::none();
+        }
+
+        let geometry = |frame: &crate::backends::camera::types::CameraFrame| {
+            frame
+                .libcamera_metadata
+                .as_ref()
+                .and_then(|m| m.scaler_zoom)
+        };
+        if self
+            .current_frame
+            .as_ref()
+            .is_some_and(|old| geometry(old) != geometry(&frame))
+        {
+            // Even a still-running detector belongs to the old field of view.
+            self.invalidate_qr_detection();
         }
 
         // Collect frames for burst mode capture

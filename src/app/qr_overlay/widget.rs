@@ -34,21 +34,41 @@ pub struct QrOverlayWidget<'a> {
     insets: BarInsets,
     rotation: SensorRotation,
     mirrored: bool,
+    residual_zoom: f32,
     /// Child button elements (one per detection)
     buttons: Vec<Element<'a, Message, Theme, Renderer>>,
 }
 
 impl<'a> QrOverlayWidget<'a> {
     /// Create a new QR overlay widget
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        detections: Vec<QrDetection>,
+        mut detections: Vec<QrDetection>,
         frame_width: u32,
         frame_height: u32,
         cover_blend: f32,
         insets: BarInsets,
         rotation: SensorRotation,
         mirrored: bool,
+        residual_zoom: f32,
     ) -> Self {
+        let residual_zoom = if residual_zoom.is_finite() {
+            residual_zoom.max(1.0)
+        } else {
+            1.0
+        };
+        // Filter on the actual QR region, before minimum-size decoration can
+        // grow an invisible detection back into a clickable on-screen box.
+        if residual_zoom > 1.0 {
+            let edge = 0.5 - 0.5 / residual_zoom;
+            detections.retain(|detection| {
+                let b = &detection.bounds;
+                b.x < 1.0 - edge
+                    && b.y < 1.0 - edge
+                    && b.x + b.width > edge
+                    && b.y + b.height > edge
+            });
+        }
         // Create button elements for each detection
         let buttons: Vec<Element<'a, Message, Theme, Renderer>> = detections
             .iter()
@@ -68,6 +88,7 @@ impl<'a> QrOverlayWidget<'a> {
             insets,
             rotation,
             mirrored,
+            residual_zoom,
             buttons,
         }
     }
@@ -121,6 +142,7 @@ impl<'a> Widget<Message, Theme, Renderer> for QrOverlayWidget<'a> {
                     video_height,
                     rotation,
                     mirrored,
+                    self.residual_zoom,
                 );
                 let center_x = x + width / 2.0;
                 let top_y = y + height + BUTTON_GAP;
@@ -178,6 +200,7 @@ impl<'a> Widget<Message, Theme, Renderer> for QrOverlayWidget<'a> {
                 video_height,
                 self.rotation,
                 self.mirrored,
+                self.residual_zoom,
             );
 
             let qr_bounds = Rectangle {
@@ -370,6 +393,7 @@ mod tests {
                             insets,
                             rotation,
                             mirrored,
+                            1.0,
                         )
                         .into();
                         let (_, node) = ui::layout(&mut overlay, &renderer, size);
@@ -379,7 +403,7 @@ mod tests {
                             calculate_video_bounds(640.0, 480.0, 640, 480, blend, insets, rotation);
                         for (child, detection) in Layout::new(&node).children().zip(&detections) {
                             let (x, y, width, height) = transform_detection_to_screen(
-                                detection, ox, oy, vw, vh, rotation, mirrored,
+                                detection, ox, oy, vw, vh, rotation, mirrored, 1.0,
                             );
                             let bounds = child.bounds();
                             assert!(
@@ -391,6 +415,131 @@ mod tests {
                             assert!(bounds.width <= 200.0 && bounds.height <= 50.0);
                         }
                     }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn residual_zoom_moves_buttons_and_removes_off_crop_actions() {
+        let renderer = ui::renderer();
+        let detections = vec![
+            QrDetection::new(
+                FrameRegion {
+                    x: 0.05,
+                    y: 0.4,
+                    width: 0.1,
+                    height: 0.15,
+                },
+                "hidden".into(),
+            ),
+            QrDetection::new(
+                FrameRegion {
+                    x: 0.4,
+                    y: 0.3,
+                    width: 0.2,
+                    height: 0.25,
+                },
+                "visible".into(),
+            ),
+        ];
+        let mut overlay: cosmic::Element<'_, Message> = QrOverlayWidget::new(
+            detections,
+            1000,
+            800,
+            1.0,
+            BarInsets::default(),
+            SensorRotation::None,
+            false,
+            2.0,
+        )
+        .into();
+        let (mut tree, node) = ui::layout(&mut overlay, &renderer, Size::new(1000.0, 800.0));
+        assert_eq!(
+            node.children().len(),
+            1,
+            "off-crop QR must not own a clickable button"
+        );
+        let child = Layout::new(&node).children().next().unwrap().bounds();
+        assert!((child.center_x() - 500.0).abs() < 0.001);
+        assert!((child.y - 488.0).abs() < 0.001, "{child:?}");
+        let messages = ui::click(&mut overlay, &mut tree, &node, &renderer, child.center());
+        assert!(matches!(messages.as_slice(), [Message::QrCopyText(text)] if text == "visible"));
+    }
+
+    #[test]
+    fn completed_native_zoom_is_not_applied_twice_across_rotation_and_mirror() {
+        use crate::backends::camera::types::{CameraFrame, FrameData, FrameMetadata, PixelFormat};
+        use crate::backends::camera::zoom::{ScalerCropBounds, ZoomRect, residual_zoom};
+        let base = ZoomRect {
+            x: 100,
+            y: 200,
+            width: 4000,
+            height: 3000,
+        };
+        let minimum = ZoomRect {
+            x: 0,
+            y: 0,
+            width: 100,
+            height: 100,
+        };
+        let bounds = ScalerCropBounds::new(minimum, base, base, base, false).unwrap();
+        let frame = CameraFrame {
+            width: 1000,
+            height: 1000,
+            stride: 4000,
+            data: FrameData::from_owned_vec(vec![]),
+            format: PixelFormat::RGBA,
+            yuv_planes: None,
+            captured_at: std::time::Instant::now(),
+            sensor_timestamp_ns: None,
+            libcamera_metadata: Some(FrameMetadata {
+                scaler_zoom: bounds.applied(Some(bounds.crop(2.0))),
+                ..Default::default()
+            }),
+        };
+        let renderer = ui::renderer();
+        for (rotation, (x, y, w, h)) in [
+            (SensorRotation::None, (0.4_f32, 0.3_f32, 0.2_f32, 0.25_f32)),
+            (SensorRotation::Rotate90, (0.3, 0.4, 0.25, 0.2)),
+            (SensorRotation::Rotate180, (0.4, 0.45, 0.2, 0.25)),
+            (SensorRotation::Rotate270, (0.45, 0.4, 0.25, 0.2)),
+        ] {
+            for mirrored in [false, true] {
+                for (desired, residual) in [(2.0, 1.0), (4.0, 2.0)] {
+                    assert_eq!(residual_zoom(desired, &frame), residual);
+                    let detection = QrDetection::new(
+                        FrameRegion {
+                            x: 0.4,
+                            y: 0.3,
+                            width: 0.2,
+                            height: 0.25,
+                        },
+                        "visible".into(),
+                    );
+                    let mut overlay = super::super::build_qr_overlay(
+                        &[detection],
+                        1000,
+                        1000,
+                        1.0,
+                        BarInsets::default(),
+                        rotation,
+                        mirrored,
+                        residual_zoom(desired, &frame),
+                    );
+                    let (_, node) = ui::layout(&mut overlay, &renderer, Size::new(1000.0, 1000.0));
+                    let button = node.children()[0].bounds();
+                    let x = if mirrored { 1.0 - x - w } else { x };
+                    let expected_center = ((x + w / 2.0 - 0.5) * residual + 0.5) * 1000.0;
+                    let expected_top = ((y + h - 0.5) * residual + 0.5) * 1000.0 + BUTTON_GAP;
+                    assert!(
+                        (button.center_x() - expected_center).abs() < 0.001,
+                        "{rotation:?} mirror={mirrored} zoom={residual} {button:?}"
+                    );
+                    assert!(
+                        (button.y - expected_top).abs() < 0.001,
+                        "{rotation:?} mirror={mirrored} zoom={residual} {button:?}"
+                    );
                 }
             }
         }
@@ -411,6 +560,7 @@ mod tests {
             BarInsets::default(),
             SensorRotation::None,
             false,
+            1.0,
         )
         .into();
         let (mut tree, node) = ui::layout(&mut overlay, &renderer, Size::new(640.0, 480.0));

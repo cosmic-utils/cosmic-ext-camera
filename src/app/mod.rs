@@ -59,6 +59,7 @@ pub(crate) use video_primitive::tests::review_decoded_preview;
 mod video_widget;
 mod view;
 mod window_controls;
+mod zoom;
 
 // Re-export public API
 use crate::backends::camera::types::{CameraDevice, CameraFormat};
@@ -564,6 +565,7 @@ impl cosmic::Application for AppModel {
             photo_timer_tick_start: None,
             photo_aspect_ratio: initial_aspect_ratio,
             zoom_level: 1.0,
+            zoom_control: Default::default(),
             zoom_animation: None,
             preview_fit_to_view: initial_preview_fit,
             fit_animation: None,
@@ -1003,6 +1005,7 @@ impl cosmic::Application for AppModel {
         let current_format = self.active_format.clone();
         let cancel_flag = Arc::clone(&self.camera_cancel_flag);
         let still_capture = Arc::clone(&self.still_capture);
+        let zoom_control = Arc::clone(&self.zoom_control);
         // Create a unique ID based on format properties to trigger restart when format changes
         let format_id = current_format
             .as_ref()
@@ -1161,6 +1164,7 @@ impl cosmic::Application for AppModel {
                                         frame_sender: sender,
                                         still_capture: Arc::clone(&still_capture),
                                         recording_sender: rec_sender,
+                                        zoom: Arc::clone(&zoom_control),
 
                                         cancel_flag: Arc::clone(&cancel_flag),
                                     },

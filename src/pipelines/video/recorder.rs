@@ -18,6 +18,7 @@ use super::stats::{
     publish_recording_diagnostics,
 };
 use crate::backends::camera::types::{CameraFrame, PixelFormat, RecordingFrame};
+use crate::backends::camera::zoom::{ZoomControl, residual_zoom};
 use crate::media::encoders::video::SelectedVideoEncoder;
 use crate::pipelines::audio_level::install_level_sync_handler as install_shared_level_sync_handler;
 use crate::pipelines::audio_level::{PULSESRC_BUFFER_TIME_US, PULSESRC_SLAVE_METHOD};
@@ -86,6 +87,8 @@ pub struct AppsrcRecorderConfig<'a> {
     /// Live filter code (read each frame via AtomicU32, updated by UI thread).
     /// Value is `FilterType::gpu_filter_code()`. 0 = Standard (no filter).
     pub live_filter_code: Arc<std::sync::atomic::AtomicU32>,
+    /// Desired zoom sampled for each frame; native-applied zoom is not repeated.
+    pub live_zoom: Arc<ZoomControl>,
 }
 
 /// Video recorder using the new pipeline architecture
@@ -715,6 +718,84 @@ fn try_shared_rgba_buffer(
         .then(|| gst::Buffer::from_slice(frame.data.clone()))
 }
 
+/// Apply residual zoom per buffer, never by mutating a downstream element:
+/// queued frames must retain their own geometry and appsrc caps stay fixed.
+async fn recording_frame_buffer(
+    frame: &CameraFrame,
+    filter_type: crate::app::FilterType,
+    zoom: f32,
+) -> Result<gst::Buffer, String> {
+    let zoom = if zoom.is_finite() { zoom.max(1.0) } else { 1.0 };
+    if zoom == 1.0
+        && let Some(buffer) = try_shared_rgba_buffer(frame, filter_type)
+    {
+        return Ok(buffer);
+    }
+    let rgba = apply_rgba_zoom(
+        convert_frame_to_rgba(frame).await?,
+        frame.width,
+        frame.height,
+        zoom,
+    )?;
+    let output = if filter_type == crate::app::FilterType::Standard {
+        rgba
+    } else {
+        match crate::shaders::apply_filter_gpu_rgba(&rgba, frame.width, frame.height, filter_type)
+            .await
+        {
+            Ok(data) => data,
+            Err(e) => {
+                warn!(error = %e, "Failed to apply filter, using unfiltered RGBA");
+                rgba
+            }
+        }
+    };
+    Ok(gst::Buffer::from_mut_slice(output))
+}
+
+/// Center-crop and upscale one RGBA buffer, retaining its original dimensions.
+/// `zoom` is residual software zoom, not the camera's total desired zoom.
+fn apply_rgba_zoom(rgba: Vec<u8>, width: u32, height: u32, zoom: f32) -> Result<Vec<u8>, String> {
+    if !zoom.is_finite() || zoom <= 1.0 {
+        return Ok(rgba);
+    }
+    if width == 0 || height == 0 {
+        return Err("Empty recording frame".into());
+    }
+    let source =
+        image::RgbaImage::from_raw(width, height, rgba).ok_or("Invalid recording RGBA layout")?;
+    let crop_width = ((width as f32 / zoom).floor() as u32).clamp(1, width);
+    let crop_height = ((height as f32 / zoom).floor() as u32).clamp(1, height);
+    let cropped = image::imageops::crop_imm(
+        &source,
+        (width - crop_width) / 2,
+        (height - crop_height) / 2,
+        crop_width,
+        crop_height,
+    );
+    Ok(image::imageops::resize(
+        &cropped.to_image(),
+        width,
+        height,
+        image::imageops::FilterType::Triangle,
+    )
+    .into_raw())
+}
+
+/// Convert and apply only zoom not already baked into this frame by the ISP.
+/// Output stays tightly packed at source dimensions for fixed-caps sinks.
+pub(crate) async fn convert_frame_to_zoomed_rgba(
+    frame: &CameraFrame,
+    desired_zoom: f32,
+) -> Result<Vec<u8>, String> {
+    apply_rgba_zoom(
+        convert_frame_to_rgba(frame).await?,
+        frame.width,
+        frame.height,
+        residual_zoom(desired_zoom, frame),
+    )
+}
+
 /// Convert a camera frame to tightly-packed RGBA using the GPU compute shader.
 ///
 /// For frames already in RGBA format, strips stride padding.
@@ -820,6 +901,7 @@ impl VideoRecorder {
                 },
             pixel_format,
             live_filter_code,
+            live_zoom,
         } = config;
 
         // Keep stable RGBA appsrc caps for the whole recording so live filter
@@ -919,6 +1001,7 @@ impl VideoRecorder {
             frame_rx,
             framerate,
             live_filter_code,
+            live_zoom,
             monitor.clone(),
         );
 
@@ -964,6 +1047,7 @@ impl VideoRecorder {
         frame_rx: tokio::sync::mpsc::Receiver<RecordingFrame>,
         framerate: u32,
         live_filter_code: Arc<std::sync::atomic::AtomicU32>,
+        live_zoom: Arc<ZoomControl>,
         monitor: RecordingMonitor,
     ) -> PusherTask {
         let resources = PusherResources {
@@ -980,7 +1064,7 @@ impl VideoRecorder {
                     biased;
                     _ = cancelled => {}
                     _ = Self::run_filtered_pusher(
-                        &resources.appsrc, frame_rx, framerate, live_filter_code, monitor,
+                        &resources.appsrc, frame_rx, framerate, live_filter_code, live_zoom, monitor,
                     ) => {}
                 }
             });
@@ -997,6 +1081,7 @@ impl VideoRecorder {
         mut frame_rx: tokio::sync::mpsc::Receiver<RecordingFrame>,
         framerate: u32,
         live_filter_code: Arc<std::sync::atomic::AtomicU32>,
+        live_zoom: Arc<ZoomControl>,
         monitor: RecordingMonitor,
     ) {
         let initial = live_filter_code.load(std::sync::atomic::Ordering::Relaxed);
@@ -1043,37 +1128,13 @@ impl VideoRecorder {
             let filter_type = crate::app::FilterType::from_gpu_filter_code(filter_code);
 
             let t0 = std::time::Instant::now();
-            let mut buffer = if let Some(buffer) = try_shared_rgba_buffer(&frame, filter_type) {
-                buffer
-            } else {
-                let rgba = match convert_frame_to_rgba(&frame).await {
-                    Ok(data) => data,
-                    Err(e) => {
-                        warn!(error = %e, "Failed to convert frame to RGBA, skipping");
-                        continue;
-                    }
-                };
-
-                let output = if filter_type == crate::app::FilterType::Standard {
-                    rgba
-                } else {
-                    match crate::shaders::apply_filter_gpu_rgba(
-                        &rgba,
-                        frame.width,
-                        frame.height,
-                        filter_type,
-                    )
-                    .await
-                    {
-                        Ok(data) => data,
-                        Err(e) => {
-                            warn!(error = %e, "Failed to apply filter, using unfiltered RGBA");
-                            rgba
-                        }
-                    }
-                };
-
-                gst::Buffer::from_mut_slice(output)
+            let zoom = residual_zoom(live_zoom.zoom(), &frame);
+            let mut buffer = match recording_frame_buffer(&frame, filter_type, zoom).await {
+                Ok(buffer) => buffer,
+                Err(e) => {
+                    warn!(error = %e, "Failed to process recording frame, skipping");
+                    continue;
+                }
             };
 
             RECORDING_STATS
@@ -1489,6 +1550,204 @@ struct AudioBranch {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn recording_zoom_crops_the_center_without_changing_resolution() {
+        gst::init().unwrap();
+        let mut frame = test_rgba_frame(8, 4, 32);
+        let mut pixels = vec![0u8; 8 * 4 * 4];
+        for y in 0..4 {
+            for x in 0..8 {
+                let i = (y * 8 + x) * 4;
+                pixels[i..i + 4].copy_from_slice(&[x as u8 * 30, y as u8 * 50, 90, 255]);
+            }
+        }
+        frame.data = crate::backends::camera::types::FrameData::from_owned_vec(pixels);
+        let buffer = recording_frame_buffer(&frame, crate::app::FilterType::Standard, 2.0)
+            .await
+            .unwrap();
+        let mapped = buffer.map_readable().unwrap();
+        assert_eq!(mapped.len(), 8 * 4 * 4);
+        assert_eq!(
+            &mapped[..4],
+            &[60, 50, 90, 255],
+            "2x must start at the centered ROI, not the source edge"
+        );
+        assert_eq!(&mapped[mapped.len() - 4..], &[150, 100, 90, 255]);
+    }
+
+    #[tokio::test]
+    async fn recording_zoom_pusher_samples_live_zoom_and_reset_at_fixed_caps() {
+        gst::init().unwrap();
+        let pipeline = gst::parse::launch(
+            "appsrc name=input is-live=true format=time caps=video/x-raw,format=RGBA,width=8,height=4,framerate=30/1 ! appsink name=output sync=false async=false",
+        ).unwrap().downcast::<gst::Pipeline>().unwrap();
+        let appsrc = pipeline
+            .by_name("input")
+            .unwrap()
+            .downcast::<gst_app::AppSrc>()
+            .unwrap();
+        let sink = pipeline
+            .by_name("output")
+            .unwrap()
+            .downcast::<gst_app::AppSink>()
+            .unwrap();
+        let zoom = Arc::new(ZoomControl::default());
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        pipeline.set_state(gst::State::Playing).unwrap();
+        let pusher = VideoRecorder::spawn_filtered_pusher(
+            appsrc,
+            rx,
+            30,
+            Arc::new(std::sync::atomic::AtomicU32::new(0)),
+            zoom.clone(),
+            RecordingMonitor::new("identity".into()),
+        );
+        let frame = test_rgba_frame(8, 4, 32);
+        let mut samples = Vec::new();
+        for (desired, native_applied) in [(1.0, false), (2.0, false), (1.0, false), (2.0, true)] {
+            zoom.set_zoom(desired);
+            let mut offered = frame.clone();
+            if native_applied {
+                use crate::backends::camera::zoom::{ScalerCropBounds, ZoomRect};
+                let base = ZoomRect {
+                    x: 0,
+                    y: 0,
+                    width: 4000,
+                    height: 3000,
+                };
+                let minimum = ZoomRect {
+                    width: 100,
+                    height: 100,
+                    ..base
+                };
+                let bounds = ScalerCropBounds::new(minimum, base, base, base, false).unwrap();
+                offered.libcamera_metadata = Some(crate::backends::camera::types::FrameMetadata {
+                    scaler_zoom: bounds.applied(Some(bounds.crop(2.0))),
+                    ..Default::default()
+                });
+            }
+            tx.send(offered.into()).await.unwrap();
+            let sink = sink.clone();
+            samples.push(
+                tokio::task::spawn_blocking(move || {
+                    sink.try_pull_sample(gst::ClockTime::from_seconds(3))
+                })
+                .await
+                .unwrap(),
+            );
+        }
+        drop(tx);
+        pusher.await.unwrap();
+        pipeline.set_state(gst::State::Null).unwrap();
+        let samples: Vec<_> = samples.into_iter().map(Option::unwrap).collect();
+        for (index, sample) in samples.iter().enumerate() {
+            let caps = sample.caps().unwrap().structure(0).unwrap();
+            assert_eq!(caps.get::<i32>("width").unwrap(), 8);
+            assert_eq!(caps.get::<i32>("height").unwrap(), 4);
+            let buffer = sample.buffer().unwrap();
+            assert_eq!(buffer.size(), 8 * 4 * 4);
+            assert_eq!(buffer.pts().unwrap().nseconds(), index as u64 * 33_333_333);
+            assert_eq!(buffer.duration().unwrap().nseconds(), 33_333_333);
+        }
+        let first = samples[0].buffer().unwrap().map_readable().unwrap();
+        let middle = samples[1].buffer().unwrap().map_readable().unwrap();
+        let reset = samples[2].buffer().unwrap().map_readable().unwrap();
+        assert_eq!(first.as_slice(), frame.data.as_ref());
+        assert_ne!(
+            middle.as_slice(),
+            first.as_slice(),
+            "live zoom must affect recording after it started"
+        );
+        assert_eq!(&middle[..4], &frame.data.as_ref()[40..44]);
+        assert_eq!(reset.as_slice(), first.as_slice());
+        let native = samples[3].buffer().unwrap().map_readable().unwrap();
+        assert_eq!(
+            native.as_slice(),
+            first.as_slice(),
+            "native 2x must not be cropped a second time by the pusher"
+        );
+    }
+
+    #[tokio::test]
+    async fn recording_zoom_native_applied_crop_is_not_repeated_and_stays_shared() {
+        gst::init().unwrap();
+        let mut frame = test_rgba_frame(8, 4, 32);
+        use crate::backends::camera::zoom::{ScalerCropBounds, ZoomRect};
+        let base = ZoomRect {
+            x: 0,
+            y: 0,
+            width: 4000,
+            height: 3000,
+        };
+        let minimum = ZoomRect {
+            width: 100,
+            height: 100,
+            ..base
+        };
+        let bounds = ScalerCropBounds::new(minimum, base, base, base, false).unwrap();
+        frame.libcamera_metadata = Some(crate::backends::camera::types::FrameMetadata {
+            scaler_zoom: bounds.applied(Some(bounds.crop(2.0))),
+            ..Default::default()
+        });
+        let output = convert_frame_to_zoomed_rgba(&frame, 2.0).await.unwrap();
+        assert_eq!(output, frame.data.as_ref());
+        let buffer = recording_frame_buffer(
+            &frame,
+            crate::app::FilterType::Standard,
+            residual_zoom(2.0, &frame),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            buffer.map_readable().unwrap().as_ptr(),
+            frame.data.as_ref().as_ptr()
+        );
+        // Hardware may clamp below the request: software applies only 4 / 2.
+        let partial = convert_frame_to_zoomed_rgba(&frame, 4.0).await.unwrap();
+        let expected = recording_frame_buffer(&frame, crate::app::FilterType::Standard, 2.0)
+            .await
+            .unwrap();
+        assert_eq!(partial, expected.map_readable().unwrap().as_slice());
+        assert_ne!(partial, output);
+    }
+
+    #[tokio::test]
+    async fn recording_zoom_repacked_rgba_keeps_pixels_and_storage_size() {
+        let frame = test_rgba_frame(8, 4, 40);
+        let unzoomed = convert_frame_to_rgba(&frame).await.unwrap();
+        let output = convert_frame_to_zoomed_rgba(&frame, 2.0).await.unwrap();
+        assert_eq!(output.len(), 8 * 4 * 4);
+        assert_eq!(&output[..4], &frame.data.as_ref()[48..52]);
+        assert_eq!(
+            convert_frame_to_zoomed_rgba(&frame, 1.0).await.unwrap(),
+            unzoomed
+        );
+    }
+
+    #[test]
+    fn recording_zoom_keeps_live_filter_after_crop_at_fixed_dimensions() {
+        let Some((_guard, _, _)) = crate::test_gpu::headless_device_with_compute() else {
+            crate::test_gpu::skip_no_gpu(
+                "recording_zoom_keeps_live_filter_after_crop_at_fixed_dimensions",
+            );
+            return;
+        };
+        gst::init().unwrap();
+        pollster::block_on(async {
+            let frame = test_rgba_frame(8, 4, 32);
+            let zoomed = convert_frame_to_zoomed_rgba(&frame, 2.0).await.unwrap();
+            let expected =
+                crate::shaders::apply_filter_gpu_rgba(&zoomed, 8, 4, crate::app::FilterType::Sepia)
+                    .await
+                    .unwrap();
+            let actual = recording_frame_buffer(&frame, crate::app::FilterType::Sepia, 2.0)
+                .await
+                .unwrap();
+            assert_eq!(actual.size(), 8 * 4 * 4);
+            assert_eq!(actual.map_readable().unwrap().as_slice(), expected);
+        });
+    }
+
     #[test]
     fn sensor_pts_waits_for_playing_even_when_a_clock_is_available() {
         gst::init().unwrap();
@@ -1590,6 +1849,7 @@ mod tests {
             },
             pixel_format: PixelFormat::RGBA,
             live_filter_code: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+            live_zoom: Arc::new(ZoomControl::default()),
         }
     }
 
@@ -1782,6 +2042,7 @@ mod tests {
                 rx,
                 30,
                 Arc::new(std::sync::atomic::AtomicU32::new(0)),
+                Arc::new(ZoomControl::default()),
                 monitor.clone(),
             )
         };
@@ -1860,6 +2121,7 @@ mod tests {
             rx,
             30,
             Arc::new(std::sync::atomic::AtomicU32::new(0)),
+            Arc::new(ZoomControl::default()),
             monitor.clone(),
         );
         // This empty pipeline never publishes EOS. Pusher cancellation must
@@ -1904,6 +2166,7 @@ mod tests {
             rx,
             30,
             Arc::new(std::sync::atomic::AtomicU32::new(0)),
+            Arc::new(ZoomControl::default()),
             monitor.clone(),
         );
         drop(pusher);
@@ -2004,6 +2267,7 @@ mod tests {
             rx,
             30,
             Arc::new(std::sync::atomic::AtomicU32::new(0)),
+            Arc::new(ZoomControl::default()),
             monitor.clone(),
         );
         tx.send(test_rgba_frame(2, 2, 8).into()).await.unwrap();
@@ -2054,6 +2318,7 @@ mod tests {
                 },
                 pixel_format: PixelFormat::RGBA,
                 live_filter_code: Arc::new(std::sync::atomic::AtomicU32::new(0)),
+                live_zoom: Arc::new(ZoomControl::default()),
             },
             rx,
             monitor.clone(),
@@ -2153,6 +2418,7 @@ mod tests {
             rx,
             30,
             Arc::new(std::sync::atomic::AtomicU32::new(0)),
+            Arc::new(ZoomControl::default()),
             monitor.clone(),
         );
         drop(tx);

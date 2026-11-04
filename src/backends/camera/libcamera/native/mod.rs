@@ -30,6 +30,7 @@
 mod capture_thread;
 pub mod diagnostics;
 pub(crate) mod pixel_formats;
+mod scaler_crop;
 
 pub use diagnostics::is_capture_active;
 
@@ -45,6 +46,7 @@ use tracing::{error, info};
 
 /// Shared communication handles passed into the native pipeline
 pub(crate) struct PipelineSharedState {
+    pub(crate) zoom: Arc<crate::backends::camera::zoom::ZoomControl>,
     pub(crate) frame_sender: FrameSender,
     pub(crate) still_capture: Arc<StillCapture>,
     pub(crate) recording_sender: Arc<Mutex<Option<tokio::sync::mpsc::Sender<RecordingFrame>>>>,
@@ -108,6 +110,7 @@ impl NativeLibcameraPipeline {
             std::sync::mpsc::sync_channel::<Result<CaptureThreadInitResult, BackendError>>(1);
 
         let params = CaptureThreadParams {
+            zoom: Arc::clone(&shared.zoom),
             camera_id: camera_id.to_string(),
             preview_metrics: Arc::clone(&preview_metrics),
             preview_width: preview_format.width,

@@ -137,7 +137,8 @@ impl PostProcessor {
             frame.yuv_planes.as_ref(),
         )
         .map_err(|e| e.to_string())?;
-        let config = self.config.clone();
+        let mut config = self.config.clone();
+        config.zoom_level = crate::backends::camera::zoom::residual_zoom(config.zoom_level, &frame);
         let frame_width = frame.width;
         let frame_height = frame.height;
         let compact_rgba = match frame.format {
@@ -298,13 +299,15 @@ impl PostProcessor {
 
     #[cfg(test)]
     pub(crate) async fn gpu_rgba_for_test(&self, frame: &CameraFrame) -> Result<Vec<u8>, String> {
-        let region = Self::final_region(frame.width, frame.height, &self.config)?;
-        self.convert_gpu_photo_region(frame, &self.config, region)
-            .await
+        let mut config = self.config.clone();
+        config.zoom_level = crate::backends::camera::zoom::residual_zoom(config.zoom_level, frame);
+        let region = Self::final_region(frame.width, frame.height, &config)?;
+        self.convert_gpu_photo_region(frame, &config, region).await
     }
 
-    /// Compose aspect crop THEN rounded center zoom in original sensor coordinates.
-    fn final_region(
+    /// Map the aspect ROI through zoom about the full frame's center, matching
+    /// the preview shader and native ScalerCrop even for asymmetric Cover ROIs.
+    pub(crate) fn final_region(
         width: u32,
         height: u32,
         config: &PostProcessingConfig,
@@ -323,8 +326,16 @@ impl PostProcessor {
             if zoom_width > w || zoom_height > h {
                 return Err("Zoom crop out of bounds".into());
             }
-            x += (w - zoom_width) / 2;
-            y += (h - zoom_height) / 2;
+            let zoom_origin = |offset: u32, extent: u32, zoomed: u32, full: u32| {
+                let center = f64::from(full) / 2.0;
+                let roi_center = f64::from(offset) + f64::from(extent) / 2.0;
+                (center + (roi_center - center) / f64::from(config.zoom_level)
+                    - f64::from(zoomed) / 2.0)
+                    .floor()
+                    .clamp(0.0, f64::from(full - zoomed)) as u32
+            };
+            x = zoom_origin(x, w, zoom_width, width);
+            y = zoom_origin(y, h, zoom_height, height);
             w = zoom_width;
             h = zoom_height;
         }
@@ -614,6 +625,10 @@ impl PostProcessor {
 }
 
 #[cfg(test)]
+#[path = "processing_zoom_tests.rs"]
+mod zoom_tests;
+
+#[cfg(test)]
 #[path = "processing_roi_tests.rs"]
 mod roi_tests;
 
@@ -630,11 +645,14 @@ mod tests {
             for crop_rect in [
                 None,
                 Some((0, 0, width, height)),
+                // Sequential ROI-center zoom is equivalent to the preview
+                // only for centered ROIs. Asymmetric Cover geometry has a
+                // separate regression against the full-frame shader pivot.
                 Some((
                     width / 3,
                     height / 3,
-                    width - width / 3,
-                    height - height / 3,
+                    width - 2 * (width / 3),
+                    height - 2 * (height / 3),
                 )),
             ] {
                 for zoom_level in [1.0, 1.01, 1.5, 2.0, 7.0, f32::INFINITY, f32::NAN] {

@@ -533,6 +533,9 @@ impl AppModel {
 
             Message::Noop => Task::none(),
         };
+        // Covers camera/format/settings resets as well as every animation
+        // tick. Zoom never changes the capture subscription identity.
+        self.sync_zoom_control();
         if !frame_message {
             self.sync_motion_photo_recorder();
         }

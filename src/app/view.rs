@@ -396,7 +396,7 @@ impl AppModel {
     ///
     /// Used by `build_overlay_popup` to keep popups out of the chip strip.
     fn zoom_chip_strip_height(&self) -> f32 {
-        if self.mode.supports_fit_and_zoom() && !self.tools_menu_visible && !self.ui_hidden {
+        if !self.tools_menu_visible && !self.ui_hidden {
             let spacing = cosmic::theme::spacing();
             f32::from(spacing.space_l) + f32::from(spacing.space_xs)
         } else {
@@ -758,7 +758,7 @@ impl AppModel {
         // Zoom/fit row is shown in modes that allow manual zoom and the
         // fit-to-view toggle (Photo, View), and never while the chrome is
         // hidden.
-        let show_zoom_label = self.mode.supports_fit_and_zoom() && !self.ui_hidden;
+        let show_zoom_label = !self.ui_hidden;
 
         // Held sideways the bars move to the side edges; the capture area is a
         // narrow (~100px) vertical lane, so the recording three-slot layout
@@ -1621,6 +1621,11 @@ impl AppModel {
     /// Build the fit/zoom controls with their normal button styling. Portrait
     /// places them side by side; side layouts stack the same upright buttons.
     fn build_fit_zoom_group(&self) -> Element<'_, Message> {
+        // Zoom is available while recording/streaming too. Fit remains a
+        // photo/view framing option, not a change to the encoded video area.
+        if !self.mode.supports_fit_and_zoom() {
+            return self.build_zoom_label();
+        }
         let spacing = cosmic::theme::spacing();
         let fit_icon_name = if self.preview_fit_to_view {
             "view-fullscreen-symbolic"
@@ -1764,6 +1769,7 @@ impl AppModel {
             self.bar_insets(),
             self.preview_adjusted_rotation(self.current_frame_rotation, should_mirror),
             should_mirror,
+            crate::backends::camera::zoom::residual_zoom(self.current_zoom_level(), frame),
         )
     }
 

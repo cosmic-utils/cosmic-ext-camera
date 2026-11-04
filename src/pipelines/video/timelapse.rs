@@ -12,9 +12,10 @@ use super::encoder_selection::{
     EncoderConfig, VideoEncoderInput, prepare_video_encoder_input, select_encoders,
 };
 use super::muxer::{create_muxer, link_muxer_to_sink, link_video_to_muxer};
-use super::recorder::{apply_video_tags_to_muxer, convert_frame_to_rgba};
+use super::recorder::{apply_video_tags_to_muxer, convert_frame_to_zoomed_rgba};
 use super::{RecordingMonitor, RecordingPhase};
 use crate::backends::camera::types::CameraFrame;
+use crate::backends::camera::zoom::ZoomControl;
 use crate::media::encoders::video::EncoderInfo;
 use gstreamer as gst;
 use gstreamer::prelude::*;
@@ -42,6 +43,7 @@ pub async fn run_timelapse_encoder(
     encoder_info: Option<EncoderInfo>,
     bitrate_kbps: Option<u32>,
     live_filter_code: Arc<AtomicU32>,
+    live_zoom: Arc<ZoomControl>,
     capture_metadata: crate::pipelines::capture_metadata::CaptureMetadata,
 ) -> Result<String, String> {
     let monitor = RecordingMonitor::new_waiting(
@@ -56,6 +58,7 @@ pub async fn run_timelapse_encoder(
         encoder_info,
         bitrate_kbps,
         live_filter_code,
+        live_zoom,
         capture_metadata,
         monitor,
     )
@@ -66,12 +69,14 @@ pub async fn run_timelapse_encoder(
 /// must not block the caller's async executor. The caller subscribes to `monitor`
 /// independently (using `RecordingMonitor::new_waiting`); abandoning this future
 /// does not cancel or retry the worker.
+#[allow(clippy::too_many_arguments)] // Keep the live controls explicit at the worker boundary.
 pub async fn run_timelapse_encoder_monitored(
     frame_rx: tokio::sync::mpsc::UnboundedReceiver<Arc<CameraFrame>>,
     output_path: PathBuf,
     encoder_info: Option<EncoderInfo>,
     bitrate_kbps: Option<u32>,
     live_filter_code: Arc<AtomicU32>,
+    live_zoom: Arc<ZoomControl>,
     capture_metadata: crate::pipelines::capture_metadata::CaptureMetadata,
     monitor: RecordingMonitor,
 ) -> Result<String, String> {
@@ -84,6 +89,7 @@ pub async fn run_timelapse_encoder_monitored(
             encoder_info,
             bitrate_kbps,
             live_filter_code,
+            live_zoom,
             capture_metadata,
             &mut guard,
         )
@@ -212,12 +218,14 @@ async fn receive_timelapse_frame(
     }
 }
 
+#[allow(clippy::too_many_arguments)] // Mirrors the public monitored entry point.
 async fn run_timelapse_encoder_inner(
     mut frame_rx: tokio::sync::mpsc::UnboundedReceiver<Arc<CameraFrame>>,
     output_path: PathBuf,
     encoder_info: Option<EncoderInfo>,
     bitrate_kbps: Option<u32>,
     live_filter_code: Arc<AtomicU32>,
+    live_zoom: Arc<ZoomControl>,
     capture_metadata: crate::pipelines::capture_metadata::CaptureMetadata,
     guard: &mut TimelapsePipeline,
 ) -> Result<String, String> {
@@ -357,7 +365,7 @@ async fn run_timelapse_encoder_inner(
     let mut frame_index: u64 = 0;
 
     // Push the first frame we already received
-    let rgba = convert_and_filter(&first_frame, &live_filter_code).await?;
+    let rgba = convert_and_filter(&first_frame, &live_filter_code, &live_zoom).await?;
     push_rgba(&appsrc, rgba, frame_index, frame_duration)?;
     frame_index += 1;
 
@@ -373,7 +381,7 @@ async fn run_timelapse_encoder_inner(
             );
             continue;
         }
-        match convert_and_filter(&frame, &live_filter_code).await {
+        match convert_and_filter(&frame, &live_filter_code, &live_zoom).await {
             Ok(rgba) => {
                 if let Err(e) = push_rgba(&appsrc, rgba, frame_index, frame_duration) {
                     error!(error = %e, frame = frame_index, "Failed to push frame, stopping");
@@ -491,8 +499,9 @@ fn link_converter_to_encoder(
 async fn convert_and_filter(
     frame: &CameraFrame,
     live_filter_code: &AtomicU32,
+    live_zoom: &ZoomControl,
 ) -> Result<Vec<u8>, String> {
-    let mut rgba = convert_frame_to_rgba(frame).await?;
+    let mut rgba = convert_frame_to_zoomed_rgba(frame, live_zoom.zoom()).await?;
 
     let filter_code = live_filter_code.load(Ordering::Relaxed);
     if filter_code != 0 {
@@ -530,6 +539,35 @@ fn push_rgba(
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn timelapse_zoom_samples_each_frame_and_resets_without_resizing() {
+        let frame = CameraFrame {
+            width: 8,
+            height: 4,
+            stride: 32,
+            format: crate::backends::camera::types::PixelFormat::RGBA,
+            data: crate::backends::camera::types::FrameData::from_owned_vec(
+                (0..128).map(|i| i as u8).collect(),
+            ),
+            yuv_planes: None,
+            captured_at: std::time::Instant::now(),
+            sensor_timestamp_ns: None,
+            libcamera_metadata: None,
+        };
+        let filter = AtomicU32::new(0);
+        let zoom = ZoomControl::default();
+        let first = convert_and_filter(&frame, &filter, &zoom).await.unwrap();
+        zoom.set_zoom(2.0);
+        let middle = convert_and_filter(&frame, &filter, &zoom).await.unwrap();
+        zoom.set_zoom(1.0);
+        let reset = convert_and_filter(&frame, &filter, &zoom).await.unwrap();
+        assert_eq!(first.len(), 128);
+        assert_eq!(middle.len(), 128);
+        assert_ne!(middle, first, "timelapse must sample zoom for every frame");
+        assert_eq!(&middle[..4], &frame.data.as_ref()[40..44]);
+        assert_eq!(reset, first);
+    }
+
     #[tokio::test(flavor = "current_thread")]
     async fn monitored_timelapse_closed_input_reports_failure_and_finishes() {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
@@ -542,6 +580,7 @@ mod tests {
             None,
             None,
             Arc::new(AtomicU32::new(0)),
+            Arc::new(ZoomControl::default()),
             Default::default(),
             monitor,
         )
@@ -568,6 +607,7 @@ mod tests {
             None,
             None,
             Arc::new(AtomicU32::new(0)),
+            Arc::new(ZoomControl::default()),
             Default::default(),
             monitor,
         ));
@@ -646,6 +686,7 @@ mod tests {
                 Some(encoder),
                 None,
                 Arc::new(AtomicU32::new(0)),
+                Arc::new(ZoomControl::default()),
                 Default::default(),
                 monitor,
             ),
@@ -694,6 +735,7 @@ mod tests {
             Some(encoder),
             None,
             Arc::new(AtomicU32::new(0)),
+            Arc::new(ZoomControl::default()),
             Default::default(),
             monitor,
         ));

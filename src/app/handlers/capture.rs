@@ -69,6 +69,12 @@ impl AppModel {
             && self.motion_photo_capture.is_none()
             && !self.burst_mode.is_active()
             && self.photo_jobs.len() < 8
+            && self.current_frame.as_deref().is_none_or(|frame| {
+                crate::backends::camera::zoom::frame_can_represent_zoom(
+                    self.current_zoom_level(),
+                    frame,
+                )
+            })
     }
 
     /// Snapshot photo-only processing preferences before dispatching a save job.
@@ -238,12 +244,31 @@ impl AppModel {
     }
 
     /// Capture a photo, optionally using a pre-captured frame (zero-shutter-lag).
-    /// Falls back to `self.current_frame` if `zsl_frame` is `None`.
+    /// Falls back to `self.current_frame` if ZSL cannot represent the shutter zoom.
     fn capture_photo_with_frame(
         &mut self,
         zsl_frame: Option<Arc<crate::backends::camera::types::CameraFrame>>,
     ) -> Task<cosmic::Action<Message>> {
         if !self.can_accept_photo() {
+            return Task::none();
+        }
+        let zoom_level = self.current_zoom_level();
+        let suitable = |frame: &Arc<crate::backends::camera::types::CameraFrame>| {
+            crate::backends::camera::zoom::frame_can_represent_zoom(zoom_level, frame)
+        };
+        let frame_arc = zsl_frame.filter(suitable).or_else(|| {
+            self.current_frame
+                .as_ref()
+                .filter(|frame| suitable(frame))
+                .cloned()
+        });
+        // Ordinary stills need usable pixels before accepting a Motion Photo
+        // or allocating a photo ID. RAW/HDR acquire their own frames.
+        if frame_arc.is_none()
+            && (self.current_frame_is_file_source
+                || (!self.would_use_burst_mode() && !self.is_current_camera_multistream()))
+        {
+            info!("No frame available for the requested capture zoom");
             return Task::none();
         }
         if self.motion_photo_enabled()
@@ -285,14 +310,8 @@ impl AppModel {
             ]);
         }
 
-        let frame_arc = if let Some(frame) = zsl_frame {
-            frame
-        } else {
-            let Some(frame) = &self.current_frame else {
-                info!("No frame available to capture");
-                return Task::none();
-            };
-            Arc::clone(frame)
+        let Some(frame_arc) = frame_arc else {
+            return Task::none();
         };
 
         info!("Capturing photo...");
@@ -308,7 +327,6 @@ impl AppModel {
 
         let save_dir = crate::app::get_photo_directory(&self.config.save_folder_name);
         let filter_type = self.selected_filter;
-        let zoom_level = self.zoom_level;
         let mirror_horizontal = self.should_mirror_captures();
 
         let geometry_rotation = self.capture_geometry_rotation();
@@ -415,7 +433,7 @@ impl AppModel {
         let preview_frame = self.current_frame.as_ref().map(Arc::clone);
         let save_dir = crate::app::get_photo_directory(&self.config.save_folder_name);
         let filter_type = self.selected_filter;
-        let zoom_level = self.zoom_level;
+        let zoom_level = self.current_zoom_level();
         let mirror_horizontal = self.should_mirror_captures();
 
         let geometry_rotation = self.capture_geometry_rotation();
@@ -627,6 +645,12 @@ impl AppModel {
 
         self.is_capturing = true;
         self.burst_mode.start_capture(frame_count);
+        self.burst_mode.capture_zoom = self.current_zoom_level();
+        // Stop an in-flight reset animation at the shutter's framing. A
+        // burst must not change field of view between alignment inputs.
+        self.zoom_level = self.burst_mode.capture_zoom;
+        self.zoom_animation = None;
+        self.sync_zoom_control();
         self.burst_mode.demosaic_method = self.config.demosaic_method;
 
         // If flash is enabled, turn it on for the entire burst capture duration
@@ -845,7 +869,7 @@ impl AppModel {
         let crop_rect = if self.motion_photo_capture.is_some()
             && let Some(frame) = frames.first()
         {
-            self.motion_photo_burst_crop(frame.width, frame.height)
+            self.motion_photo_burst_frame_crop(frame)
         } else if let Some(frame) = frames.first() {
             let (rw, rh) = if geometry_rotation.swaps_dimensions() {
                 (frame.height, frame.width)
@@ -877,6 +901,25 @@ impl AppModel {
             }
         } else {
             None
+        };
+
+        let crop_rect = if self.motion_photo_capture.is_none() {
+            match frames
+                .first()
+                .map(|frame| {
+                    crate::app::zoom::burst_zoom_crop(
+                        frame,
+                        crop_rect,
+                        self.burst_mode.capture_zoom,
+                    )
+                })
+                .transpose()
+            {
+                Ok(crop) => crop.flatten(),
+                Err(error) => return self.handle_burst_mode_complete(Err(error)),
+            }
+        } else {
+            crop_rect
         };
 
         // Create burst mode config with user's settings
@@ -1228,7 +1271,14 @@ impl AppModel {
         Task::none()
     }
 
+    pub(crate) fn sync_zoom_control(&self) {
+        self.zoom_control.set_zoom(self.current_zoom_level());
+    }
+
     pub(crate) fn handle_zoom_in(&mut self) -> Task<cosmic::Action<Message>> {
+        if self.burst_mode.is_collecting_frames() {
+            return Task::none();
+        }
         // Multiplicative zoom: each step is ~2% magnification change,
         // so it feels consistent at any zoom level.
         let new_zoom = (self.zoom_level * 1.02).min(10.0);
@@ -1237,10 +1287,14 @@ impl AppModel {
             self.zoom_animation = None; // step zoom is real-time
             debug!(zoom = self.zoom_level, "Zoom in");
         }
+        self.sync_zoom_control();
         Task::none()
     }
 
     pub(crate) fn handle_zoom_out(&mut self) -> Task<cosmic::Action<Message>> {
+        if self.burst_mode.is_collecting_frames() {
+            return Task::none();
+        }
         // Multiplicative zoom: each step is ~2% magnification change.
         let new_zoom = (self.zoom_level / 1.02).max(1.0);
         if (new_zoom - self.zoom_level).abs() > 0.001 {
@@ -1248,6 +1302,7 @@ impl AppModel {
             self.zoom_animation = None; // step zoom is real-time
             debug!(zoom = self.zoom_level, "Zoom out");
         }
+        self.sync_zoom_control();
         Task::none()
     }
 
@@ -1256,6 +1311,9 @@ impl AppModel {
     /// spawned — the existing one picks up the replaced animation, same
     /// pattern as `start_fit_animation`.
     pub(crate) fn handle_reset_zoom(&mut self) -> Task<cosmic::Action<Message>> {
+        if self.burst_mode.is_collecting_frames() {
+            return Task::none();
+        }
         let from = self.current_zoom_level();
         if (from - 1.0).abs() <= 0.001 {
             return Task::none();
@@ -1267,6 +1325,7 @@ impl AppModel {
             from,
         });
         debug!(from, "Zoom reset to 1.0 (animated)");
+        self.sync_zoom_control();
         if was_idle {
             Self::delay_task(16, Message::ZoomAnimationTick)
         } else {
@@ -1275,11 +1334,15 @@ impl AppModel {
     }
 
     pub(crate) fn handle_pinch_zoom(&mut self, level: f32) -> Task<cosmic::Action<Message>> {
+        if self.burst_mode.is_collecting_frames() {
+            return Task::none();
+        }
         let new_zoom = level.clamp(1.0, 10.0);
         if (new_zoom - self.zoom_level).abs() > 0.001 {
             self.zoom_level = new_zoom;
             self.zoom_animation = None; // pinch is real-time
         }
+        self.sync_zoom_control();
         Task::none()
     }
 
@@ -2099,6 +2162,7 @@ impl AppModel {
         let recording_bridge = self.recording_bridge.clone();
 
         let live_filter = self.recording_filter_code.clone();
+        let live_zoom = Arc::clone(&self.zoom_control);
         let record_audio = self.config.record_audio;
 
         let recording_task = Task::perform(
@@ -2150,6 +2214,7 @@ impl AppModel {
                                 },
                                 pixel_format,
                                 live_filter_code: live_filter.clone(),
+                                live_zoom: Arc::clone(&live_zoom),
                             }
                         };
 
@@ -2361,6 +2426,7 @@ impl AppModel {
             .unwrap_or((1920, 1080));
         let bitrate_kbps = Some(self.config.bitrate_preset.bitrate_kbps(w, h));
         let live_filter_code = Arc::clone(&self.recording_filter_code);
+        let live_zoom = Arc::clone(&self.zoom_control);
         self.recording_session_counter += 1;
         let operation = crate::app::recording_error::EncoderOperation::Timelapse(
             self.recording_session_counter,
@@ -2400,6 +2466,7 @@ impl AppModel {
                     encoder_info,
                     bitrate_kbps,
                     live_filter_code,
+                    live_zoom,
                     capture_metadata,
                     monitor,
                 )
@@ -2876,6 +2943,102 @@ mod tests {
             .to_string_lossy()
             .into_owned();
         model
+    }
+
+    fn native_zoom_frame(zoom: f32) -> Arc<crate::backends::camera::types::CameraFrame> {
+        use crate::backends::camera::types::FrameMetadata;
+        use crate::backends::camera::zoom::{ScalerCropBounds, ZoomRect};
+
+        let base = ZoomRect {
+            x: 0,
+            y: 0,
+            width: 4000,
+            height: 3000,
+        };
+        let min = ZoomRect {
+            width: 100,
+            height: 100,
+            ..base
+        };
+        let bounds = ScalerCropBounds::new(min, base, base, base, false).unwrap();
+        let mut frame = live_model().current_frame.unwrap().as_ref().clone();
+        frame.libcamera_metadata = Some(FrameMetadata {
+            scaler_zoom: bounds.applied(Some(bounds.crop(zoom))),
+            ..Default::default()
+        });
+        Arc::new(frame)
+    }
+
+    #[tokio::test]
+    async fn zsl_zoom_out_prefers_suitable_current_frame() {
+        let mut model = live_model();
+        model.config.motion_photo = false;
+        model.zoom_level = 1.0;
+        let current = native_zoom_frame(1.0);
+        let zsl = native_zoom_frame(4.0);
+        model.current_frame = Some(Arc::clone(&current));
+        assert!(model.can_accept_photo());
+
+        let _task = model.capture_photo_with_frame(Some(Arc::clone(&zsl)));
+
+        assert_eq!(
+            Arc::strong_count(&current),
+            3,
+            "save must own the suitable current frame"
+        );
+        assert_eq!(
+            Arc::strong_count(&zsl),
+            1,
+            "old native 4x must not be exported at 1x"
+        );
+        assert_eq!(model.photo_jobs.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn zsl_zoom_out_without_suitable_frame_rejects_before_motion_or_photo_jobs() {
+        let mut model = live_model();
+        model.zoom_level = 1.0;
+        model.current_frame = None;
+        let next_id = model.next_photo_id;
+        assert!(model.can_accept_photo());
+
+        let task = model.capture_photo_with_frame(Some(native_zoom_frame(4.0)));
+
+        assert!(cosmic::iced::runtime::task::into_stream(task).is_none());
+        assert!(model.photo_jobs.is_empty());
+        assert!(model.motion_photo_capture.is_none());
+        assert!(model.motion_photo_error.is_none());
+        assert!(model.hardware_photo_id.is_none());
+        assert!(!model.still_capture.has_request());
+        assert!(!model.is_capturing);
+        assert_eq!(model.next_photo_id, next_id);
+        assert_eq!(model.shutdown_pending_saves(), 0);
+    }
+
+    #[tokio::test]
+    async fn zsl_compatible_frame_preserves_arc_identity_including_raw() {
+        for raw in [false, true] {
+            let mut model = live_model();
+            model.config.motion_photo = false;
+            model.zoom_level = if raw { 1.0 } else { 4.0 };
+            let current = native_zoom_frame(1.0);
+            let mut zsl = native_zoom_frame(if raw { 4.0 } else { 2.0 });
+            if raw {
+                Arc::get_mut(&mut zsl).unwrap().format =
+                    crate::backends::camera::types::PixelFormat::BayerRGGB;
+            }
+            model.current_frame = Some(Arc::clone(&current));
+
+            let _task = model.capture_photo_with_frame(Some(Arc::clone(&zsl)));
+
+            assert_eq!(
+                Arc::strong_count(&zsl),
+                2,
+                "save must retain the original ZSL Arc (raw={raw})"
+            );
+            assert_eq!(Arc::strong_count(&current), 2);
+            assert_eq!(model.photo_jobs.len(), 1);
+        }
     }
 
     async fn next_capture_message<S>(stream: &mut S) -> super::Message
