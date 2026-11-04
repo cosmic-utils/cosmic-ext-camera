@@ -306,7 +306,7 @@ impl cosmic::Application for AppModel {
             .author("Frederic Laing")
             .license("GPL-3.0-only")
             .license_url("https://www.gnu.org/licenses/gpl-3.0.html")
-            .developers([("Frederic Laing", "frederic.laing.development@gmail.com")])
+            .developers([("Frederic Laing", "dev@fredfunk.tech")])
             .links([
                 (fl!("repository"), REPOSITORY),
                 (

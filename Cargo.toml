@@ -5,7 +5,7 @@ edition = "2024"
 license = "GPL-3.0-only"
 description = "Modern camera app for Linux desktops and phones"
 repository = "https://github.com/cosmic-utils/cosmic-ext-camera"
-authors = ["Frederic Laing <frederic.laing.development@gmail.com>"]
+authors = ["Frederic Laing <dev@fredfunk.tech>"]
 
 [dependencies]
 # Pure-Rust client for the PulseAudio wire protocol. Used to enumerate audio
