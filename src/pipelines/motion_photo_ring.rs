@@ -235,6 +235,31 @@ impl MemoryEncoder {
                     encoder.set_property_from_str(prop, "0");
                 }
             }
+            if info.element_name == "x265enc" {
+                // All-intra x265 repeats VPS/SPS/PPS in every access unit.
+                // The plugin prepends a separate header memory to the first;
+                // older versions overallocate it when fetching repeated headers
+                // after encoding, leaving uninitialized bytes for h265parse.
+                // Keep the complete encoded AU, not that redundant prefix.
+                encoder
+                    .static_pad("src")
+                    .ok_or("No x265 source pad")?
+                    .add_probe(gst::PadProbeType::BUFFER, |_, probe| {
+                        if let Some(buffer) = probe.buffer_mut() {
+                            let repeated_headers = buffer.n_memory() == 2
+                                && (0..2).all(|i| {
+                                    buffer.peek_memory(i).map_readable().is_ok_and(|bytes| {
+                                        bytes.starts_with(&[0, 0, 0, 1, 0x40, 1])
+                                    })
+                                });
+                            if repeated_headers {
+                                buffer.make_mut().remove_memory(0);
+                            }
+                        }
+                        gst::PadProbeReturn::Remove
+                    })
+                    .ok_or("Cannot observe x265 headers")?;
+            }
             let input = super::video::encoder_selection::prepare_video_encoder_input(
                 &encoder,
                 &info.element_name,
@@ -1160,6 +1185,58 @@ mod tests {
             times.last().unwrap()
         );
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn hevc_first_access_unit_has_one_parameter_set_copy() {
+        let info = EncoderInfo {
+            element_name: "x265enc".into(),
+            display_name: "HEVC".into(),
+            codec: crate::media::encoders::video::VideoCodec::HEVC,
+            is_hardware: false,
+            priority: 0,
+        };
+        let mut encoder =
+            MemoryEncoder::new(&info, 64, 48, 10, 800, None, std::time::Instant::now()).unwrap();
+        let video_encoder = encoder
+            .pipeline
+            .iterate_elements()
+            .into_iter()
+            .map(Result::unwrap)
+            .find(|element| element.factory().is_some_and(|f| f.name() == "x265enc"))
+            .unwrap();
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        video_encoder.static_pad("src").unwrap().add_probe(
+            gst::PadProbeType::BUFFER,
+            move |_, probe| {
+                if let Some(buffer) = probe.buffer() {
+                    let _ = sender.send(
+                        buffer
+                            .map_readable()
+                            .map(|bytes| bytes.to_vec())
+                            .map_err(|error| error.to_string()),
+                    );
+                }
+                gst::PadProbeReturn::Remove
+            },
+        );
+        encoder
+            .push(
+                image::RgbImage::from_pixel(64, 48, image::Rgb([220, 10, 10])),
+                0,
+            )
+            .unwrap();
+        let bytes = receiver
+            .recv_timeout(std::time::Duration::from_secs(5))
+            .unwrap()
+            .unwrap();
+        for nal_type in [32, 33, 34] {
+            let copies = bytes
+                .windows(5)
+                .filter(|nal| nal[..4] == [0, 0, 0, 1] && (nal[4] >> 1) & 0x3f == nal_type)
+                .count();
+            assert_eq!(copies, 1, "duplicate HEVC parameter set {nal_type}");
+        }
     }
 
     #[test]
