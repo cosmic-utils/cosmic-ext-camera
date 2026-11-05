@@ -12,19 +12,33 @@
 # Run:    see preview/generate-previews.sh
 FROM registry.fedoraproject.org/fedora:44
 
-# Build dependencies for the app itself. libcamera 0.7 is packaged in Fedora 44,
-# which is why this is a Fedora base: on Ubuntu it has to be built from source
-# (see the `check` job in ci.yml), costing several minutes per run.
+# Build dependencies for the app itself. Build the pinned libcamera 0.8.0
+# release below rather than relying on Fedora's older packaged ABI.
 RUN dnf install -y --setopt=install_weak_deps=False \
         rust cargo \
         gcc gcc-c++ clang-devel cmake make nasm pkgconf-pkg-config git \
         gstreamer1-devel \
         gstreamer1-plugins-base-devel \
         gstreamer1-plugins-bad-free-devel \
-        libcamera-devel \
+        meson ninja-build python3-jinja2 python3-pyyaml python3-ply libyaml-devel \
         libdav1d-devel \
         wayland-devel libxkbcommon-devel systemd-devel dbus-devel \
     && dnf clean all
+
+# Keep the native ABI aligned with the Cargo bindings and Flatpak manifest.
+RUN git clone --depth 1 --branch v0.8.0 \
+        https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera \
+    && cd /tmp/libcamera \
+    && test "$(git rev-parse HEAD)" = df8e348d64b4932a0676256ed24f0da3ee9438bc \
+    && meson setup build --prefix=/usr --libdir=lib64 \
+        -Dpipelines=uvcvideo,simple -Dipas=softisp \
+        -Dgstreamer=disabled -Dtest=false -Dcam=disabled -Dqcam=disabled \
+        -Dlc-compliance=disabled -Dtracing=disabled -Ddocumentation=disabled \
+        -Dpycamera=disabled \
+    && ninja -C build && ninja -C build install \
+    && ldconfig \
+    && test "$(pkg-config --modversion libcamera)" = 0.8.0 \
+    && cd / && rm -rf /tmp/libcamera
 
 # Runtime: a headless wlroots compositor (sway) to host the window, software
 # Vulkan (lavapipe) for the app's wgpu renderer, wtype to drive the keyboard

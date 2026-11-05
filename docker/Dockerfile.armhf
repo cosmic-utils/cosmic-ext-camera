@@ -1,16 +1,16 @@
 # Cross-compilation image for armhf (armv7-unknown-linux-gnueabihf)
-FROM ubuntu:25.04
+FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Configure apt sources: amd64 from archive.ubuntu.com, armhf from ports.ubuntu.com
 RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/ubuntu.sources && \
-    echo 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky main universe' > /etc/apt/sources.list && \
-    echo 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu plucky-updates main universe' >> /etc/apt/sources.list && \
-    echo 'deb [arch=amd64] http://security.ubuntu.com/ubuntu plucky-security main universe' >> /etc/apt/sources.list && \
-    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports plucky main universe' >> /etc/apt/sources.list && \
-    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports plucky-updates main universe' >> /etc/apt/sources.list && \
-    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports plucky-security main universe' >> /etc/apt/sources.list
+    echo 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble main universe' > /etc/apt/sources.list && \
+    echo 'deb [arch=amd64] http://archive.ubuntu.com/ubuntu noble-updates main universe' >> /etc/apt/sources.list && \
+    echo 'deb [arch=amd64] http://security.ubuntu.com/ubuntu noble-security main universe' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble main universe' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-updates main universe' >> /etc/apt/sources.list && \
+    echo 'deb [arch=armhf] http://ports.ubuntu.com/ubuntu-ports noble-security main universe' >> /etc/apt/sources.list
 
 # Install base tools (before adding armhf architecture)
 # Note: libglib2.0-dev-bin must be installed here (amd64) to prevent
@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     nasm \
     libglib2.0-dev-bin \
     libclang-dev \
+    git meson ninja-build python3-jinja2 python3-yaml python3-ply \
     && rm -rf /var/lib/apt/lists/*
 
 # Add armhf architecture and install cross-compilation toolchain and dependencies
@@ -31,7 +32,7 @@ RUN dpkg --add-architecture armhf && \
     apt-get update && apt-get install -y \
     gcc-arm-linux-gnueabihf \
     g++-arm-linux-gnueabihf \
-    libcamera-dev:armhf \
+    libyaml-dev:armhf \
     libdav1d-dev:armhf \
     libglib2.0-dev:armhf \
     libgstreamer1.0-dev:armhf \
@@ -43,6 +44,10 @@ RUN dpkg --add-architecture armhf && \
     libudev-dev:armhf \
     libseat-dev:armhf \
     && rm -rf /var/lib/apt/lists/*
+
+# Build target libcamera rather than using Ubuntu's older distro ABI.
+COPY docker/build-libcamera.sh /usr/local/bin/build-libcamera.sh
+RUN sh /usr/local/bin/build-libcamera.sh arm-linux-gnueabihf
 
 # Set up environment for cross-compilation
 ENV CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc \

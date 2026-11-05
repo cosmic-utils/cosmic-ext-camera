@@ -407,9 +407,9 @@ impl LibcameraBackend {
                 .get::<libcamera::properties::Location>()
                 .ok()
                 .map(|l| match l {
-                    libcamera::properties::Location::CameraFront => "front".to_string(),
-                    libcamera::properties::Location::CameraBack => "back".to_string(),
-                    libcamera::properties::Location::CameraExternal => "external".to_string(),
+                    libcamera::properties::Location::Front => "front".to_string(),
+                    libcamera::properties::Location::Back => "back".to_string(),
+                    libcamera::properties::Location::External => "external".to_string(),
                 })
                 .or(dt.location);
 

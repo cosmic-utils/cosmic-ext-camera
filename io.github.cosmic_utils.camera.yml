@@ -135,10 +135,10 @@ modules:
     sources:
       - type: git
         url: https://git.libcamera.org/libcamera/libcamera.git
-        tag: v0.7.2
-        commit: 191e202178f02430b5942397c70d215cdd2056fa
-      # Since v0.7.2 the virtual pipeline handler is built on every arch, and it
-      # pulls in libyuv as a cmake subproject. Meson would clone libyuv from its
+        tag: v0.8.0
+        commit: df8e348d64b4932a0676256ed24f0da3ee9438bc
+      # The virtual pipeline handler is built on every arch and pulls in
+      # libyuv as a cmake subproject. Meson would clone libyuv from its
       # wrap, but the build sandbox has no network. Provide the sources up front
       # (fetched during the source phase) so meson uses them instead of cloning.
       # Revision matches subprojects/libyuv.wrap in the libcamera tree.

@@ -16,13 +16,17 @@ RUN apk add --no-cache \
     gst-plugins-bad-dev \
     gst-plugins-base-dev \
     gstreamer-dev \
-    libcamera-dev \
     libinput-dev \
     libseat-dev \
     libxkbcommon-dev \
     nasm \
     pkgconf \
-    wayland-dev
+    wayland-dev \
+    git meson samurai py3-jinja2 py3-yaml py3-ply linux-headers yaml-dev openssl
+
+# Build the pinned ABI instead of waiting for Alpine's libcamera package.
+COPY docker/build-libcamera.sh /usr/local/bin/build-libcamera.sh
+RUN sh /usr/local/bin/build-libcamera.sh x86_64-linux-musl
 
 # Install Rust via rustup rather than Alpine's native packages. Alpine edge
 # patches rustc with a different ABI fingerprint that causes compilation

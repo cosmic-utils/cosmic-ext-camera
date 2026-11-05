@@ -73,7 +73,7 @@ jobs:
           toolchain: ${{ steps.toolchain.outputs.version }}
           components: rustfmt, clippy
 
-      - name: Set up native dependencies and libcamera 0.7.2
+      - name: Set up native dependencies and libcamera 0.8.0
         run: >-
           bash scripts/ci-native-setup.sh
           libglib2.0-dev
@@ -156,7 +156,7 @@ jobs:
           key: ${{ matrix.arch }}
           cache-all-crates: true
 
-      - name: Set up native dependencies and libcamera 0.7.2 (native build)
+      - name: Set up native dependencies and libcamera 0.8.0 (native build)
         if: ${{ !matrix.use_cross }}
         run: bash scripts/ci-native-setup.sh libglib2.0-dev
 
@@ -201,7 +201,6 @@ jobs:
             gst-plugins-base-dev \
             gstreamer-dev \
             just \
-            libcamera-dev \
             libxkbcommon-dev \
             nasm \
             pkgconf \
@@ -225,6 +224,9 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-tags: true
+
+      - name: Build and install native libcamera 0.8.0 APKs
+        run: sh docker/build-libcamera-apk.sh
 
       - name: Generate APKBUILD and source tarball
         run: |

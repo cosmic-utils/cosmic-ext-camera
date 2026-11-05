@@ -56,7 +56,7 @@ flatpak install camera-x86_64.flatpak
 - Rust (stable)
 - [cosmic-icons](https://github.com/pop-os/cosmic-icons)
 - GStreamer 1.20 or newer with plugins (base, good, bad, ugly)
-- libcamera (>= 0.4.0)
+- libcamera 0.8.0, including development headers and pkg-config metadata
 - dav1d (>= 1.3.0), including development headers and pkg-config metadata, for AVIF decoding
 - cmake (for building embedded libjpeg-turbo)
 - libwayland
@@ -273,14 +273,19 @@ cross build --release --target aarch64-unknown-linux-gnu
 
 | Target | Dockerfile | Base |
 |--------|-----------|------|
-| `aarch64-unknown-linux-gnu` | `docker/Dockerfile.aarch64` | Ubuntu 25.04 |
-| `armv7-unknown-linux-gnueabihf` | `docker/Dockerfile.armhf` | Ubuntu 25.04 |
+| `aarch64-unknown-linux-gnu` | `docker/Dockerfile.aarch64` | Ubuntu 24.04 |
+| `armv7-unknown-linux-gnueabihf` | `docker/Dockerfile.armhf` | Ubuntu 24.04 |
 | `riscv64gc-unknown-linux-gnu` | `docker/Dockerfile.riscv64` | Ubuntu 24.04 |
-| `x86_64-unknown-linux-gnu` | `docker/Dockerfile.x86_64` | Ubuntu 25.04 |
+| `x86_64-unknown-linux-gnu` | `docker/Dockerfile.x86_64` | Ubuntu 24.04 |
 | `x86_64-unknown-linux-musl` | `docker/Dockerfile.x86_64-musl` | Alpine |
 | `aarch64-unknown-linux-musl` | `docker/Dockerfile.aarch64-musl` | Alpine + clang |
 
-The configuration is in `Cross.toml`. Docker or Podman is required.
+The configuration is in `Cross.toml`. Docker or Podman is required. The GNU
+images build native libcamera 0.8.0 from its pinned upstream release for each
+target architecture. Alpine images require `libcamera-dev>=0.8.0` in their
+configured repositories and fail rather than falling back to an older ABI.
+These packaged binaries need matching `libcamera.so.0.8` and
+`libcamera-base.so.0.8` libraries on the destination system.
 
 **Podman users:** If your system uses btrfs, configure the storage driver:
 
@@ -304,6 +309,16 @@ CROSS_BUILD_OPTS="--network=host" CROSS_CONTAINER_OPTS="--network=host" cross bu
 ```bash
 just apk-build aarch64
 ```
+
+The musl build images compile the pinned libcamera 0.8.0 source rather than
+installing Alpine's libcamera development package. The aarch64 image installs
+the resulting libraries and headers into its target sysroot. APK CI and the
+packaging image build and install local `libcamera` and `libcamera-dev` APKs so
+`abuild` can satisfy the same versioned dependencies without waiting for Alpine
+to publish the release. These build-time libraries include the UVC and simple
+pipelines with the software ISP; they are not a full replacement for Alpine's
+distribution package. Camera APKs still require a matching libcamera 0.8 runtime
+on the target system.
 
 On an x86_64 host the packaging half runs in an emulated aarch64 container, and
 that needs `binfmt_misc` registered with the `C` (credentials) flag. Distros
@@ -332,6 +347,10 @@ this build.
 ### Distrobox (Atomic Desktops)
 
 For development on atomic/immutable desktops (Fedora Silverblue, Kinoite, Bazzite, etc.):
+
+The Distrobox setup targets `libcamera-devel >= 0.8.0` from the configured
+repositories. If unavailable, use the Flatpak build or provide a matching native
+libcamera 0.8.0 build.
 
 ```bash
 # Create the development container

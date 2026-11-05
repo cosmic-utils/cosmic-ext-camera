@@ -26,10 +26,11 @@ sudo apt-get install -y \
   libyaml-dev "$@"
 
 # Keep the exact release and commit aligned with the Flatpak manifest.
-git clone --depth 1 --branch v0.7.2 https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera
+git clone --depth 1 --branch v0.8.0 https://git.libcamera.org/libcamera/libcamera.git /tmp/libcamera
 cd /tmp/libcamera
-test "$(git rev-parse HEAD)" = 191e202178f02430b5942397c70d215cdd2056fa
-meson setup build -Dprefix=/usr -Dpipelines=uvcvideo,simple -Dipas=simple -Dgstreamer=disabled -Dtest=false -Dcam=disabled -Dqcam=disabled -Dlc-compliance=disabled -Dtracing=disabled -Ddocumentation=disabled -Dpycamera=disabled
+test "$(git rev-parse HEAD)" = df8e348d64b4932a0676256ed24f0da3ee9438bc
+meson setup build -Dprefix=/usr -Dpipelines=uvcvideo,simple -Dipas=softisp -Dgstreamer=disabled -Dtest=false -Dcam=disabled -Dqcam=disabled -Dlc-compliance=disabled -Dtracing=disabled -Ddocumentation=disabled -Dpycamera=disabled
 ninja -C build
 sudo ninja -C build install
 sudo ldconfig
+test "$(pkg-config --modversion libcamera)" = 0.8.0
