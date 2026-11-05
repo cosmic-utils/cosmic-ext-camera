@@ -58,6 +58,7 @@
     <p>Key features:</p>
     <p xml:lang="cs">Klíčové funkce:</p>
     <p xml:lang="de">Wichtigste Funktionen:</p>
+    <p xml:lang="es">Características de tecla:</p>
     <p xml:lang="fi">Avain ominaisuudet:</p>
     <p xml:lang="fr">Fonctionnalités clés :</p>
     <p xml:lang="hu">Főbb funkciók:</p>
@@ -207,6 +208,7 @@
       <caption>Photo mode with tools menu</caption>
       <caption xml:lang="cs">Režim fotografie s nabídkou nástrojů</caption>
       <caption xml:lang="de">Fotomodus mit Werkzeugmenü</caption>
+      <caption xml:lang="es">Modo de foto con menú de herramientas</caption>
       <caption xml:lang="fi">Kuvatila työkaluvalikolla</caption>
       <caption xml:lang="fr">Mode photo avec menu d'outils</caption>
       <caption xml:lang="hu">Fotómód megnyitott eszközmenüvel</caption>
@@ -269,6 +271,7 @@
       <caption>Filter picker</caption>
       <caption xml:lang="cs">Výběr filtrů</caption>
       <caption xml:lang="de">Filterauswahl</caption>
+      <caption xml:lang="es">Selector de filtros</caption>
       <caption xml:lang="fi">Suodatinvalitsin</caption>
       <caption xml:lang="fr">Sélecteur de filtre</caption>
       <caption xml:lang="hu">Szűrőválasztó</caption>
@@ -300,6 +303,7 @@
       <caption>Video recording in progress</caption>
       <caption xml:lang="cs">Probíhající natáčení videa</caption>
       <caption xml:lang="de">Laufende Videoaufnahme</caption>
+      <caption xml:lang="es">Grabación de vídeo en progreso</caption>
       <caption xml:lang="fi">Videotallennus käynnissä</caption>
       <caption xml:lang="fr">Enregistrement vidéo en cours</caption>
       <caption xml:lang="hu">Folyamatban lévő videófelvétel</caption>
@@ -331,6 +335,7 @@
       <caption>QR code detection</caption>
       <caption xml:lang="cs">Detekce QR kódu</caption>
       <caption xml:lang="de">QR-Code-Erkennung</caption>
+      <caption xml:lang="es">Detección del código QR</caption>
       <caption xml:lang="fi">QR-koodin tunnistaminen</caption>
       <caption xml:lang="fr">Détection de QR code</caption>
       <caption xml:lang="hu">QR-kód felismerése</caption>
@@ -362,6 +367,7 @@
       <caption>Advanced settings</caption>
       <caption xml:lang="cs">Pokročilá nastavení</caption>
       <caption xml:lang="de">Erweiterte Einstellungen</caption>
+      <caption xml:lang="es">Ajustes avanzados</caption>
       <caption xml:lang="fi">Edistyneet asetukset</caption>
       <caption xml:lang="fr">Paramètres avancés</caption>
       <caption xml:lang="hu">Speciális beállítások</caption>
