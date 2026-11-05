@@ -6,11 +6,11 @@
 
 |  |  |
 | :---: | :---: |
-| ![Photo mode with tools menu](preview-001.png)<br>**Photo mode with tools menu** | ![Photo mode on a Linux phone](preview-002.png)<br>**Photo mode on a Linux phone** |
-| ![Filter picker](preview-003.png)<br>**Filter picker** | ![Video recording in progress](preview-004.png)<br>**Video recording in progress** |
-| ![QR code detection](preview-005.png)<br>**QR code detection** | ![Advanced settings](preview-006.png)<br>**Advanced settings** |
+| ![Modo de foto con menú de herramientas](preview-001.png)<br>**Modo de foto con menú de herramientas** | ![Photo mode on a Linux phone](preview-002.png)<br>**Photo mode on a Linux phone** |
+| ![Selector de filtros](preview-003.png)<br>**Selector de filtros** | ![Grabación de vídeo en progreso](preview-004.png)<br>**Grabación de vídeo en progreso** |
+| ![Detección del código QR](preview-005.png)<br>**Detección del código QR** | ![Ajustes avanzados](preview-006.png)<br>**Ajustes avanzados** |
 
-> 6 of 6 captions are not translated into `es` yet
+> 1 of 6 captions are not translated into `es` yet
 > and are shown in English. Translations are welcome in
 > [`i18n/es/camera.ftl`](../../../i18n/es/camera.ftl).
 
