@@ -1163,6 +1163,35 @@ mod tests {
     }
 
     #[test]
+    fn hevc_memory_packets_omit_encoder_info_sei() {
+        let info = EncoderInfo {
+            element_name: "x265enc".into(),
+            display_name: "HEVC".into(),
+            codec: crate::media::encoders::video::VideoCodec::HEVC,
+            is_hardware: false,
+            priority: 0,
+        };
+        let mut encoder =
+            MemoryEncoder::new(&info, 64, 48, 10, 800, None, std::time::Instant::now()).unwrap();
+        for i in 0..3 {
+            test_fixture::push_frame(
+                &mut encoder,
+                image::RgbImage::from_pixel(64, 48, image::Rgb([220, 10, 10])),
+                i * 100_000_000,
+            );
+        }
+        let ring = encoder.ring.lock().unwrap();
+        assert_eq!(ring.packets.len(), 3);
+        for packet in &ring.packets {
+            let bytes = packet.buffer.map_readable().unwrap();
+            assert!(
+                !bytes.windows(4).any(|s| s == b"x265"),
+                "HEVC packets must omit the optional encoder-info SEI that older x265 plugins corrupt"
+            );
+        }
+    }
+
+    #[test]
     fn continuous_hevc_ring_decodes_before_and_after_on_shutter_timeline() {
         assert_continuous_codec_decodes_on_shutter_timeline(
             "x265enc",
