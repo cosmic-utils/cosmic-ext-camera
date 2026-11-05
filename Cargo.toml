@@ -119,10 +119,10 @@ opt-level = 1
 log = "0.4.35"
 naga = { version = "30.0.1", features = ["wgsl-in"] }
 
-# Use the 0.8.0 bindings, including the matching low-level C++ bridge.
-[patch.crates-io]
-libcamera = { git = "https://github.com/FreddyFunk/libcamera-rs.git", branch = "feature/0.8.0" }
-libcamera-sys = { git = "https://github.com/FreddyFunk/libcamera-rs.git", branch = "feature/0.8.0" }
+# Upstream 0.8.0 includes these bindings; retain the fork overrides for reference.
+# [patch.crates-io]
+# libcamera = { git = "https://github.com/FreddyFunk/libcamera-rs.git", branch = "feature/0.8.0" }
+# libcamera-sys = { git = "https://github.com/FreddyFunk/libcamera-rs.git", branch = "feature/0.8.0" }
 
 
 
@@ -148,6 +148,6 @@ libcamera-sys = { git = "https://github.com/FreddyFunk/libcamera-rs.git", branch
 
 # Local libcamera-rs development
 #
-# Replace the entries in [patch.crates-io] above for local development:
+# [patch.crates-io]
 # libcamera = { path = "../libcamera-rs/libcamera" }
 # libcamera-sys = { path = "../libcamera-rs/libcamera-sys" }
