@@ -34,6 +34,13 @@ pub(super) fn configure_clip_video_encoder(
         height,
         Some(bitrate),
     );
+    if info.element_name == "x265enc" {
+        // Older x265 plugins can corrupt the optional encoder-info SEI when
+        // fetching headers after encoding the first frame. h265parse then
+        // splits the AU and loses its PTS. Omit only this diagnostic payload;
+        // keep the codec headers, image quality and shutter timeline intact.
+        encoder.set_property("option-string", "info=0");
+    }
     if info.element_name.starts_with("v4l2") {
         if encoder.find_property("extra-controls").is_none() {
             return Err(
