@@ -39,9 +39,9 @@ bytemuck = { version = "1.25.2", features = ["derive"] }
 dirs = "7.0.0"
 rqrr = "0.11.0"
 rfd = "0.17.2"
-# Keep the default runtime: synchronous portal guards use block_on, and its
-# helper thread keeps their connections alive between calls.
-zbus = "6.2.1"
+# libcosmic enables Tokio; keep synchronous portal connections running between
+# block_on calls rather than leaving them on zbus's current-thread runtime.
+zbus = { version = "6.2.1", features = ["tokio-multithread"] }
 # XDG portal integration for color-scheme detection on non-COSMIC desktops
 ashpd = { version = "0.13.13", default-features = false, features = [
     "open_uri",
