@@ -17,6 +17,7 @@ depends="
 	gst-plugins-good
 	libcamera>=0.8.0
 	libdav1d
+	pipewire-tools
 "
 makedepends="
 	cargo-auditable

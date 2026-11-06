@@ -14,6 +14,7 @@ depends="
 	gst-plugins-good
 	libcamera>=0.8.0
 	libdav1d
+	pipewire-tools
 	so:libcamera.so.0.8
 	so:libcamera-base.so.0.8
 "
