@@ -12,8 +12,12 @@ updates:
       prefix: "deps(cargo)"
     open-pull-requests-limit: 10
     groups:
-      # Keep libcosmic and its Iced crates outside the registry dependency group.
-      # Major upgrades remain individual PRs.
+      # Update crates from the libcosmic Git repository together.
+      libcosmic:
+        patterns:
+          - "libcosmic"
+          - "iced_*"
+      # Keep registry dependencies separate; major upgrades remain individual PRs.
       rust-dependencies:
         patterns:
           - "*"
