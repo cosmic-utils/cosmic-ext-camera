@@ -397,6 +397,113 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="1.11.0" date="2026-11-06">
+      <description>
+        <p>Release 1.11.0 includes the following changes:</p>
+        <ul>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump the rust-dependencies group with 2 updates</li>
+          <li>fix: stabilize QR detection</li>
+          <li>fix: bound recording backpressure</li>
+          <li>perf: optimize frame data handling</li>
+          <li>feat: add capture metadata</li>
+          <li>fix: apply live filters to video recordings</li>
+          <li>deps(cargo): bump crc32fast from 1.5.0 to 1.5.2 in the rust-dependencies group</li>
+          <li>fix: constrain software encoder chroma</li>
+          <li>perf: avoid standard RGBA recording copy</li>
+          <li>perf: optimize CPU usage for webcams with MJPEG video streams</li>
+          <li>fix: prevent audio dropouts</li>
+          <li>fix: prevent microphone clipping</li>
+          <li>feat: enable compatible V4L2 hardware encoding</li>
+          <li>fix: repair V4L2 timelapse encoding</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>perf: pool native capture frame buffers</li>
+          <li>fix: prevent overlapping Insights text</li>
+          <li>feat: add AVIF photo export</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump the rust-dependencies group with 3 updates</li>
+          <li>fix: show empty state when no camera is available</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>chore(l10n): update translations</li>
+          <li>fix(photo): normalize padded rendered pixel formats</li>
+          <li>fix(frames): validate active planes before preview replacement</li>
+          <li>fix(mjpeg): preserve decoder color and sampling geometry</li>
+          <li>fix(preview): expand RGB24 byte texels on GPU</li>
+          <li>fix(photo): propagate required Bayer decode failures</li>
+          <li>feat(raw): retain negotiated packing and per-site black metadata</li>
+          <li>fix: negotiate camera streams with single-stream fallback</li>
+          <li>fix: show USB camera model names</li>
+          <li>feat: add PipeWire-backed V4L2 camera fallback</li>
+          <li>fix: match captured photo aspect ratio to preview</li>
+          <li>fix(tests): skip compute tests when Vulkan is unavailable</li>
+          <li>fix: repair plane metadata on older PipeWire plugins</li>
+          <li>fix: avoid repeated libcamera discovery during PipeWire capture</li>
+          <li>Fix/settings button camera switch</li>
+          <li>feat(raw): unify highlight-safe Bayer processing with GPU demosaicing</li>
+          <li>perf: optimize photo packing and bilinear demosaic</li>
+          <li>feat: add Android Motion Photo 1.0 capture</li>
+          <li>fix: resolve Clippy warnings</li>
+          <li>fix: prevent settings changes from blocking the UI</li>
+          <li>fix: stabilize asynchronous capture and motion photo tests</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump the rust-dependencies group with 3 updates</li>
+          <li>perf: optimize still-photo GPU processing</li>
+          <li>refactor: clean up obsolete code</li>
+          <li>fix: make video format defaults consistent with photos</li>
+          <li>fix(apkbuild): add missing libudev build dependency</li>
+          <li>refactor: remove test-only ROI reference shaders</li>
+          <li>refactor: remove unused code</li>
+          <li>deps(cargo): bump serde_json from 1.0.152 to 1.0.154 in the rust-dependencies group</li>
+          <li>chore(l10n): update translations</li>
+          <li>fix: respect desktop window button preferences</li>
+          <li>chore: regenerate preview screenshots</li>
+          <li>fix(apkbuild): resolve JPEG ABI conflict and add test dependencies</li>
+          <li>refactor: unify douplicate code paths</li>
+          <li>fix: avoid double rotation of libcamera frames</li>
+          <li>refactor: share common infrastructure</li>
+          <li>chore(l10n): update translations</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump the rust-dependencies group with 2 updates</li>
+          <li>deps: migrate to zbus 6</li>
+          <li>deps(cargo): bump libc from 0.2.190 to 0.2.191 in the rust-dependencies group</li>
+          <li>fix(apkbuild): add D-Bus session test dependency</li>
+          <li>deps(cargo): bump crc32fast from 1.5.2 to 1.5.3 in the rust-dependencies group</li>
+          <li>fix: reset photo timer and cancel pending countdown</li>
+          <li>fix: place toolbox beside shutter and align rotated capture controls</li>
+          <li>fix: share Motion Photo preference between title bar and settings</li>
+          <li>feat: add native capture toggle feedback and reset flash state</li>
+          <li>fix: keep desktop logging off the UI thread</li>
+          <li>fix: keep video toolbox above capture controls</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump the rust-dependencies group with 5 updates</li>
+          <li>fix: monitor encoder failures without blocking recording cleanup</li>
+          <li>fix: support V4L2 VP8 and keep recording timestamps on the pipeline timeline</li>
+          <li>chore(l10n): update translations</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump zbus from 6.1.0 to 6.2.0 in the rust-dependencies group</li>
+          <li>chore(l10n): update translations</li>
+          <li>feat: add cargo toml patches for local development testing of libcosmic and libcamera</li>
+          <li>chore: regenerate preview screenshots</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump log from 0.4.34 to 0.4.35 in the rust-dependencies group</li>
+          <li>fix: prevent expanded carousel from overlapping side buttons</li>
+          <li>feat: integrate live ScalerCrop zoom across camera modes</li>
+          <li>fix: keep toolbox stationary during carousel expansion</li>
+          <li>fix: support live zoom in motion photos</li>
+          <li>deps: refresh dependencies and automation</li>
+          <li>chore: update contact email</li>
+          <li>chore(l10n): update translations</li>
+          <li>fix: prevent HEVC Motion Photo encoding failures</li>
+          <li>chore: require libcamera 0.8.0</li>
+          <li>chore: regenerate preview screenshots</li>
+          <li>test: await Motion Photo pre-roll readiness notifications</li>
+          <li>fix(deps): group libcosmic and Iced Dependabot updates</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+          <li>deps(cargo): bump the libcosmic group with 4 updates</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.3.7" date="2026-09-24">
       <description>
         <p>Release 1.3.7 includes the following changes:</p>
