@@ -100,19 +100,9 @@ async fn encoded_motion_clip_follows_live_zoom_through_pre_and_postroll() {
     model.sync_motion_photo_recorder();
     let original = model.motion_photo_recorder.as_ref().unwrap().cancel.clone();
     let deadline = Instant::now() + Duration::from_secs(10);
-    while !model
-        .motion_photo_recorder
-        .as_ref()
-        .unwrap()
-        .pre_roll_ready()
-    {
-        assert!(
-            Instant::now() < deadline,
-            "encoded pre-roll never became ready"
-        );
-        model.forward_motion_photo_frame(&source());
-        tokio::time::sleep(Duration::from_millis(50)).await;
-    }
+    model
+        .warm_motion_photo_recorder(Duration::from_millis(50))
+        .await;
     model.start_motion_photo_capture().unwrap();
     let _ = model.update(crate::app::Message::PinchZoom(2.0));
     while !model

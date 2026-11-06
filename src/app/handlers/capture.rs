@@ -4018,30 +4018,39 @@ mod tests {
     }
 
     async fn warm_live_model(model: &mut crate::app::state::AppModel) {
+        warm_live_model_with_cadence(model, std::time::Duration::from_millis(100)).await;
+    }
+
+    async fn warm_live_model_with_cadence(
+        model: &mut crate::app::state::AppModel,
+        cadence: std::time::Duration,
+    ) {
         model.preview_fit_to_view = true;
         model.photo_aspect_ratio = crate::app::state::PhotoAspectRatio::Native;
         model.sync_motion_photo_recorder();
-        // As in the encoder-ring tests, wait for encoded output rather than
-        // assuming pipeline startup has completed after a fixed frame count.
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-        loop {
-            let mut frame = model.current_frame.as_ref().unwrap().as_ref().clone();
-            frame.captured_at = std::time::Instant::now();
-            model.forward_motion_photo_frame(&Arc::new(frame));
-            if model
+        model.warm_motion_photo_recorder(cadence).await;
+    }
+
+    #[tokio::test]
+    async fn motion_photo_warmup_observes_ready_output_between_sparse_preview_frames() {
+        let mut model = live_model();
+        // The producer can be descheduled beyond the encoded freshness budget.
+        // It must observe ready output without waiting for its next frame tick.
+        warm_live_model_with_cadence(&mut model, std::time::Duration::from_millis(300)).await;
+        assert!(
+            model
                 .motion_photo_recorder
                 .as_ref()
                 .unwrap()
                 .pre_roll_ready()
-            {
-                break;
-            }
-            assert!(
-                std::time::Instant::now() < deadline,
-                "Motion Photo recorder did not produce a decodable pre-roll"
-            );
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        }
+        );
+        model
+            .motion_photo_recorder
+            .take()
+            .unwrap()
+            .stop_and_wait()
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

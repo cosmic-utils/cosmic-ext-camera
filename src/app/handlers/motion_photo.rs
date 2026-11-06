@@ -119,7 +119,7 @@ struct ShutterRequest {
 pub(crate) struct MotionPhotoRecorder {
     monitor: RecordingMonitor,
     #[cfg(test)]
-    pre_roll_ready: Arc<AtomicBool>,
+    pre_roll_ready: tokio::sync::watch::Receiver<bool>,
     draining: Arc<AtomicBool>,
     postroll_requests: Arc<AtomicUsize>,
     recipe: RecorderRecipe,
@@ -132,7 +132,7 @@ pub(crate) struct MotionPhotoRecorder {
 impl MotionPhotoRecorder {
     #[cfg(test)]
     pub(crate) fn pre_roll_ready(&self) -> bool {
-        self.pre_roll_ready.load(Ordering::Acquire)
+        *self.pre_roll_ready.borrow()
     }
 
     pub(crate) async fn stop_and_wait(mut self) -> Result<(), String> {
@@ -175,6 +175,44 @@ impl Drop for MotionPhotoCapture {
 }
 
 impl AppModel {
+    /// Feed synthetic preview frames while awaiting encoded output independently.
+    #[cfg(test)]
+    pub(crate) async fn warm_motion_photo_recorder(&mut self, cadence: Duration) {
+        let recorder = self.motion_photo_recorder.as_ref().unwrap();
+        let mut ready = recorder.pre_roll_ready.clone();
+        let mut status = recorder.monitor.subscribe();
+        let mut frames = tokio::time::interval(cadence);
+        frames.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        let deadline = tokio::time::sleep(Duration::from_secs(10));
+        tokio::pin!(deadline);
+        loop {
+            if let Some(error) = &status.borrow().error {
+                panic!("Motion Photo pre-roll failed: {error}");
+            }
+            if *ready.borrow_and_update() {
+                break;
+            }
+            // Readiness can become true and expire between preview ticks.
+            // Observe output independently of the synthetic frame cadence.
+            tokio::select! {
+                _ = frames.tick() => {
+                    let mut frame = self.current_frame.as_ref().unwrap().as_ref().clone();
+                    frame.captured_at = Instant::now();
+                    self.forward_motion_photo_frame(&Arc::new(frame));
+                }
+                result = ready.changed() => {
+                    result.expect("Motion Photo worker stopped before pre-roll became ready");
+                }
+                result = status.changed() => {
+                    result.expect("Motion Photo monitor closed before pre-roll became ready");
+                }
+                _ = &mut deadline => {
+                    panic!("Motion Photo recorder did not produce a decodable pre-roll: {:?}", status.borrow());
+                }
+            }
+        }
+    }
+
     pub(crate) fn should_show_motion_photo_button(&self) -> bool {
         self.mode == crate::app::CameraMode::Photo && self.motion_photo_format_compatible()
     }
@@ -492,9 +530,7 @@ impl AppModel {
         let rotation = recipe.rotation;
         let mirror = recipe.mirror;
         #[cfg(test)]
-        let pre_roll_ready = Arc::new(AtomicBool::new(false));
-        #[cfg(test)]
-        let worker_pre_roll_ready = pre_roll_ready.clone();
+        let (worker_pre_roll_ready, pre_roll_ready) = tokio::sync::watch::channel(false);
         self.recording_session_counter = self.recording_session_counter.wrapping_add(1);
         let operation = EncoderOperation::MotionPhoto(self.recording_session_counter);
         // An enabled prebuffer waiting for its first camera frame is not startup.
@@ -717,7 +753,7 @@ fn run_memory_recorder(
     source_cancel: Arc<AtomicBool>,
     draining: Arc<AtomicBool>,
     monitor: RecordingMonitor,
-    #[cfg(test)] pre_roll_ready: Arc<AtomicBool>,
+    #[cfg(test)] pre_roll_ready: tokio::sync::watch::Sender<bool>,
 ) {
     // Declared before the encoder so Finished is published only after Drop's
     // potentially blocking driver cleanup has actually returned.
@@ -746,12 +782,14 @@ fn run_memory_recorder(
             break;
         }
         #[cfg(test)]
-        pre_roll_ready.store(
-            encoder
+        pre_roll_ready.send_if_modified(|ready| {
+            let next = encoder
                 .as_ref()
-                .is_some_and(|encoder| encoder.pre_roll_ready(origin.elapsed().as_nanos() as u64)),
-            Ordering::Release,
-        );
+                .is_some_and(|encoder| encoder.pre_roll_ready(origin.elapsed().as_nanos() as u64));
+            let changed = *ready != next;
+            *ready = next;
+            changed
+        });
         while pending.len() < 8 {
             match shutters.try_recv() {
                 Ok(p) => pending.push(p),
