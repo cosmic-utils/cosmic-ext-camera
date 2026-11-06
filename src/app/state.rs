@@ -360,13 +360,21 @@ pub struct InhibitGuard {
 
 impl Drop for InhibitGuard {
     fn drop(&mut self) {
-        let _ = zbus::block_on(self.connection.call_method(
-            Some("org.freedesktop.portal.Desktop"),
-            &self.handle,
-            Some("org.freedesktop.portal.Request"),
-            "Close",
-            &(),
-        ));
+        // Drop can run inside either Tokio runtime flavor. Keep zbus's own
+        // runtime entry on a separate thread, just like portal acquisition.
+        std::thread::scope(|scope| {
+            let _ = scope
+                .spawn(|| {
+                    let _ = zbus::block_on(self.connection.call_method(
+                        Some("org.freedesktop.portal.Desktop"),
+                        &self.handle,
+                        Some("org.freedesktop.portal.Request"),
+                        "Close",
+                        &(),
+                    ));
+                })
+                .join();
+        });
     }
 }
 

@@ -2587,7 +2587,11 @@ impl AppModel {
 /// pop-os/xdg-desktop-portal-cosmic#342) return an error here and the caller
 /// leaves the session un-inhibited; there is no direct-D-Bus fallback.
 fn portal_inhibit() -> Result<crate::app::state::InhibitGuard, String> {
-    zbus::block_on(portal_inhibit_async())
+    // libcosmic enables zbus's Tokio backend. Its block_on must run outside
+    // the app's executor, including when a synchronous update runs in a task.
+    std::thread::spawn(|| zbus::block_on(portal_inhibit_async()))
+        .join()
+        .map_err(|_| "portal Inhibit worker panicked".to_string())?
 }
 
 async fn portal_inhibit_async() -> Result<crate::app::state::InhibitGuard, String> {
@@ -2697,6 +2701,49 @@ mod portal_inhibit_tests {
         zbus::block_on(guard.connection.peer_creds()).unwrap();
         drop(guard);
         receive_close.recv_timeout(Duration::from_secs(5)).unwrap();
+
+        // App updates and guard cleanup can also run inside an existing Tokio
+        // executor. Exercise both runtime flavors without touching the desktop.
+        for runtime in [
+            tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap(),
+            tokio::runtime::Builder::new_multi_thread()
+                .worker_threads(2)
+                .enable_all()
+                .build()
+                .unwrap(),
+        ] {
+            let guard = super::portal_inhibit().unwrap();
+            runtime.block_on(async {
+                // The retained connection must keep processing traffic even
+                // when no thread is inside zbus::block_on.
+                tokio::time::timeout(
+                    Duration::from_secs(5),
+                    guard.connection.call_method(
+                        Some("org.freedesktop.DBus"),
+                        "/org/freedesktop/DBus",
+                        Some("org.freedesktop.DBus"),
+                        "ListNames",
+                        &(),
+                    ),
+                )
+                .await
+                .expect("portal connection must progress between synchronous calls")
+                .unwrap();
+                drop(guard);
+            });
+            receive_close.recv_timeout(Duration::from_secs(5)).unwrap();
+
+            runtime.block_on(async {
+                let guard = super::portal_inhibit().unwrap();
+                assert_eq!(guard.handle.as_str(), REQUEST_PATH);
+                assert!(receive_close.try_recv().is_err());
+                drop(guard);
+            });
+            receive_close.recv_timeout(Duration::from_secs(5)).unwrap();
+        }
         drop(service);
     }
 }
