@@ -17,7 +17,7 @@ virtual-camera-file-filter-name = Bilder und Videos
 filters-title = Filter
 # Settings
 settings-title = Einstellungen
-settings-appearance = Erscheinungsbild
+settings-appearance = Aussehen
 settings-theme = Design
 match-desktop = An Desktop anpassen
 dark = Dunkel
@@ -26,8 +26,8 @@ settings-video = Video
 settings-device = Gerät
 settings-microphone = Mikrofon
 settings-record-audio = Audio aufnehmen
-settings-audio-encoder = Audio-Encoder
-settings-encoder = Encoder
+settings-audio-encoder = Video-/Audiocodierer
+settings-encoder = Codierer
 settings-quality = Qualität
 settings-mirror-preview = Vorschau spiegeln
 settings-mirror-preview-description = Kameravorschau horizontal spiegeln
@@ -51,7 +51,7 @@ device-info-libcamera-version = libcamera
 device-info-multistream = Multi-Stream
 device-info-multistream-yes = Unterstützt
 device-info-multistream-no = Nicht unterstützt
-device-info-rotation = Rotation
+device-info-rotation = Drehung
 device-info-none = Keine Geräteinformationen verfügbar
 # Bitrate presets
 # Camera preview
@@ -127,7 +127,7 @@ hdr-plus-frames-50 = 50 Bilder
 # Photo settings
 settings-photo = Foto
 settings-photo-format = Ausgabeformat
-settings-photo-format-description = Dateiformat für gespeicherte Fotos. JPEG ist komprimiert, PNG ist verlustfrei, DNG bewahrt Rohdaten zur Bearbeitung.
+settings-photo-format-description = Dateiformat für gespeicherte Fotos. JPEG und AVIF sind verlustbehaftet, PNG ist verlustfrei, DNG bewahrt die Rohdaten für die Bearbeitung.
 settings-hdr-plus = HDR+ (experimentell)
 settings-hdr-plus-description = Mehrfachaufnahme für verbesserte Fotos bei wenig Licht und erweiterten Dynamikumfang. Automatik wählt die Bildanzahl basierend auf der Szenenhelligkeit.
 settings-save-burst-raw = Burst-Rohbilder speichern
@@ -189,7 +189,7 @@ insights-stream-frame-count = Bilder
 # Insights - Recording
 insights-recording = Aufnahme-Pipeline
 insights-recording-mode = Modus
-insights-recording-encoder = Encoder
+insights-recording-encoder = Codierer
 insights-recording-resolution = Auflösung
 insights-recording-capture = Aufnahme-Thread
 insights-recording-channel = Kanal
@@ -286,11 +286,11 @@ filter-standard = Original
 filter-mono = Mono
 filter-sepia = Sepia
 filter-noir = Noir
-filter-vivid = Vivid
+filter-vivid = Lebhaft
 filter-cold = Kalt
 filter-warm = Warm
 filter-fade = Ausgewaschen
-filter-duotone = Duotone
+filter-duotone = Zweifarbig
 filter-vignette = Vignette
 filter-negative = Negativ
 filter-posterize = Posterisieren
@@ -300,8 +300,8 @@ filter-pencil = Skizze
 ptz-pan = Schwenk
 ptz-tilt = Neigung
 desktop-comment = Fotos aufnehmen, Videos aufzeichnen und QR-Codes scannen
-desktop-keywords = camera;webcam;photo;video;kamera;foto;
-metainfo-summary = Fotos und Videos aufnehmen
+desktop-keywords = Kamera;Webcam;Webkamera;Foto;Photo;Video;
+metainfo-summary = Kamera für Fotos, Videos und QR-Codes
 metainfo-description-intro = { camera } ist eine moderne Kamera-App für Linux, für den Desktop genauso wie fürs Smartphone. Ob du schnell ein Foto machst, ein Video aufnimmst oder einen QR-Code scannst, { camera } bleibt schlicht und übersichtlich und kommt dir dabei nicht in die Quere.
 metainfo-description-usage = Einfach die App öffnen und den Moment festhalten. Leg witzige Filter über deine Fotos, scanne QR-Codes, um Links zu öffnen oder dich mit WiFi zu verbinden, oder nutze die virtuelle Kamera, um in Videoanrufen mit deinem Lieblingsfilter gut auszusehen.
 metainfo-description-features-title = Wichtigste Funktionen:
@@ -323,9 +323,45 @@ action-toggle-filters = Filterauswahl umschalten
 action-toggle-ui-chrome = Bedienelemente ein-/ausblenden
 action-toggle-preview-fit = Einpassen / Ausfüllen umschalten
 settings-other = Sonstiges
-settings-overlay = Overlay
+settings-overlay = Überlagerung
 settings-controls-position = Position der Bedienelemente
 settings-controls-position-description = Legt fest, ob die Bedienelemente für die Aufnahme am unteren, linken oder rechten Rand angezeigt werden. Bei „Links“ und „Rechts“ wird die Titelleiste zusätzlich an den jeweils gegenüberliegenden Rand verschoben, ohne die Kameravorschau zu drehen.
 controls-position-bottom = Unten
 controls-position-left = Links
 controls-position-right = Rechts
+toggle-flash-on = BLITZ EIN
+toggle-flash-off = BLITZ AUS
+toggle-motion-on = BEWEGUNG EIN
+toggle-motion-off = BEWEGUNG AUS
+toggle-hdr-on = HDR EIN
+toggle-hdr-off = HDR AUS
+recording-error-dismiss = Ablehnen
+no-camera-available = Keine Kamera verfügbar
+insights-v4l2-in-backend = In { $backend } verfügbar
+insights-v4l2-active-in-backend = In { $backend } aktiv
+insights-v4l2-not-in-backend = In { $backend } nicht verfügbar
+insights-frame-copy-time = Kopierzeit des Bildspeichers
+recording-error-title = Videocodierer fehlgeschlagen
+recording-error-automatic = Automatischer Videocodierer
+settings-motion-photo = Bewegtbild
+settings-motion-photo-description = Ein kurzes Video wird mit dem ausgewählten Videocodierer kontinuierlich im Speicher gepuffert. JPEG-/AVIF-Fotos werden mit einem Zeitbereich von 1,25 Sekunden vor und nach dem Auslösen gespeichert. Nicht verfügbar für PNG/DNG; deine Einstellung wird beim Formatwechsel erhalten.
+settings-audio-encoder-description = Gilt nur für Videoaufnahmen. Bewegtfotos verwenden gemäß der Android-Spezifikation für Bewegtfotos immer AAC.
+settings-demosaicing = Demosaicing
+settings-demosaicing-description = Algorithmus zur Rekonstruktion der Farben in RAW-Fotos
+shutdown-pending-saves =
+    { $count ->
+        [0] Herunterfahren wird abgeschlossen
+        [one] 1 ausstehende Foto-/Videospeicherung
+       *[other] { $count } ausstehende Foto-/Videospeicherungen
+    }
+recording-error-body =
+    Der Videocodierer „{ $encoder }“ ist ausgefallen oder reagiert nicht mehr.
+
+    Starte dein Gerät neu. Wähle nach dem Neustart unter Einstellungen > Video einen anderen Videocodierer aus, bevor du erneut aufnimmst.
+
+    Bei Hardware-Codierern handelt es sich wahrscheinlich um einen Fehler im Linux-Kernel oder im Gerätetreiber. Bitte melde das Problem bei den Maintainer deines Geräts und gib dabei den Namen des Codierers sowie Details zum Fehler an.
+
+    Die Aufnahme ist möglicherweise unvollständig.
+
+    Fehler: { $error }
+insights-preview-delivery-drops = Kameravorschau bricht ab
