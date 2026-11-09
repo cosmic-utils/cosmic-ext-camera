@@ -23,7 +23,7 @@
   <name xml:lang="zh-CN">相机</name>
   <summary>Camera for photos, videos and QR codes</summary>
   <summary xml:lang="cs">Pořizujte fotografie a videa</summary>
-  <summary xml:lang="de">Fotos und Videos aufnehmen</summary>
+  <summary xml:lang="de">Kamera für Fotos, Videos und QR-Codes</summary>
   <summary xml:lang="fi">Kamera kuville, videoille sekä QR-koodeille</summary>
   <summary xml:lang="fr">Prendre des photos et vidéos</summary>
   <summary xml:lang="hu">Fotók készítése és videók rögzítése</summary>
@@ -114,7 +114,7 @@
       <li xml:lang="zh-CN">二维码扫描器：打开链接、连接 WiFi 等</li>
       <li>14 creative filters: Mono, Sepia, Vivid, Noir, Pencil, and more</li>
       <li xml:lang="cs">14 kreativních filtrů: Černobílý, Sépie, Živý, Noir, Skica a další</li>
-      <li xml:lang="de">14 kreative Filter: Mono, Sepia, Vivid, Noir, Skizze und mehr</li>
+      <li xml:lang="de">14 kreative Filter: Mono, Sepia, Lebhaft, Noir, Skizze und mehr</li>
       <li xml:lang="fi">14 eri suodatinta: Mono,Seepia,Eläväinen,Noir,Lyijy, sekä muita</li>
       <li xml:lang="fr">14 filtres créatifs : Mono, Sépia, Vif, Noir, Crayon, et bien plus encore</li>
       <li xml:lang="hu">14 kreatív szűrő: Monokróm, Szépia, Élénk, Noir, Ceruza és még sok más</li>
