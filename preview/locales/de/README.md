@@ -2,7 +2,7 @@
 
 # Kamera (de)
 
-*Fotos und Videos aufnehmen.*
+*Kamera für Fotos, Videos und QR-Codes.*
 
 |  |  |
 | :---: | :---: |
