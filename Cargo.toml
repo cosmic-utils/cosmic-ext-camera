@@ -43,7 +43,7 @@ rfd = "0.17.2"
 # block_on calls rather than leaving them on zbus's current-thread runtime.
 zbus = { version = "6.2.1", features = ["tokio-multithread"] }
 # XDG portal integration for color-scheme detection on non-COSMIC desktops
-ashpd = { version = "0.13.13", default-features = false, features = [
+ashpd = { version = "0.14.0", default-features = false, features = [
     "open_uri",
     "settings",
     "tokio",
