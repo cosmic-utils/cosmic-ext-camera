@@ -4,7 +4,7 @@ runtime-version: '26.08'
 sdk: org.freedesktop.Sdk
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
-  - org.freedesktop.Sdk.Extension.llvm22
+  - org.freedesktop.Sdk.Extension.llvm23
 base: com.system76.Cosmic.BaseApp
 base-version: stable
 command: camera
@@ -154,8 +154,8 @@ modules:
       env:
         CARGO_HOME: /run/build/camera/cargo
         CARGO_TARGET_DIR: /run/build/camera/target
-        LIBCLANG_PATH: /usr/lib/sdk/llvm22/lib
-        BINDGEN_EXTRA_CLANG_ARGS: -I/usr/lib/sdk/llvm22/lib/clang/22/include
+        LIBCLANG_PATH: /usr/lib/sdk/llvm23/lib
+        BINDGEN_EXTRA_CLANG_ARGS: -I/usr/lib/sdk/llvm23/lib/clang/23/include
         # libcamera installs to lib64 on x86_64, but flatpak's default
         # PKG_CONFIG_PATH only includes lib/pkgconfig
         PKG_CONFIG_PATH: /app/lib64/pkgconfig:/app/lib/pkgconfig:/app/share/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig

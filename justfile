@@ -323,7 +323,7 @@ flatpak-install:
     flatpak info org.freedesktop.Sdk//${RUNTIME_VERSION} &>/dev/null || DEPS_MISSING=true
     flatpak info org.freedesktop.Platform//${RUNTIME_VERSION} &>/dev/null || DEPS_MISSING=true
     flatpak info org.freedesktop.Sdk.Extension.rust-stable//${RUNTIME_VERSION} &>/dev/null || DEPS_MISSING=true
-    flatpak info org.freedesktop.Sdk.Extension.llvm22//${RUNTIME_VERSION} &>/dev/null || DEPS_MISSING=true
+    flatpak info org.freedesktop.Sdk.Extension.llvm23//${RUNTIME_VERSION} &>/dev/null || DEPS_MISSING=true
     flatpak info com.system76.Cosmic.BaseApp//stable &>/dev/null || DEPS_MISSING=true
     if [ "$DEPS_MISSING" = true ]; then
         echo "Flatpak dependencies missing, installing..."
@@ -357,7 +357,7 @@ flatpak-deps arch="":
     sudo flatpak install -y --noninteractive flathub org.freedesktop.Platform//${RUNTIME_VERSION} $ARCH_FLAG
     sudo flatpak install -y --noninteractive flathub org.freedesktop.Sdk//${RUNTIME_VERSION} $ARCH_FLAG
     sudo flatpak install -y --noninteractive flathub org.freedesktop.Sdk.Extension.rust-stable//${RUNTIME_VERSION} $ARCH_FLAG
-    sudo flatpak install -y --noninteractive flathub org.freedesktop.Sdk.Extension.llvm22//${RUNTIME_VERSION} $ARCH_FLAG
+    sudo flatpak install -y --noninteractive flathub org.freedesktop.Sdk.Extension.llvm23//${RUNTIME_VERSION} $ARCH_FLAG
     sudo flatpak install -y --noninteractive flathub com.system76.Cosmic.BaseApp//stable $ARCH_FLAG
     echo "Flatpak dependencies installed!"
 
