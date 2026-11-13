@@ -28,7 +28,7 @@ settings-video = Vidéo
 settings-device = Périphérique
 settings-microphone = Microphone
 settings-record-audio = Enregistrer l'audio
-settings-audio-encoder = Encodeur audio
+settings-audio-encoder = Encodeur vidéo et audio
 settings-encoder = Encodeur
 settings-quality = Qualité
 settings-mirror-preview = Aperçu miroir
@@ -126,7 +126,7 @@ hdr-plus-frames-50 = 50 images
 # Paramètres photo
 settings-photo = Photo
 settings-photo-format = Format de sortie
-settings-photo-format-description = Format de fichier pour les photos enregistrées. JPEG est compressé, PNG est sans perte, DNG conserve les données brutes pour l'édition.
+settings-photo-format-description = Format de fichier pour les photos enregistrées. JPEG et AVIF sont compressés avec perte, PNG est sans perte, DNG conserve les données brutes pour l'édition.
 settings-hdr-plus = HDR+ (expérimental)
 settings-hdr-plus-description = Capture multi-images pour des photos améliorées en basse lumière et une plage dynamique étendue. Le nombre d'images est sélectionné automatiquement en fonction de la luminosité de la scène.
 settings-save-burst-raw = Enregistrer les images brutes de la rafale
@@ -334,3 +334,39 @@ settings-controls-position-description = Placez les commandes de capture sur le 
 controls-position-bottom = Bas
 controls-position-left = Gauche
 controls-position-right = Droite
+toggle-flash-on = FLASH ON
+toggle-flash-off = FLASH OFF
+toggle-motion-on = MOUVEMENT ON
+toggle-motion-off = MOUVEMENT OFF
+toggle-hdr-on = HDR ON
+toggle-hdr-off = HDR OFF
+recording-error-title = L'encodeur vidéo a échoué
+recording-error-automatic = Encodeur vidéo automatique
+recording-error-body =
+    L’encodeur vidéo "{ $encoder }" a échoué ou a cessé de répondre.
+
+    Redémarrez votre appareil. Après le redémarrage, sélectionnez un autre encodeur vidéo dans Paramètres > Vidéo avant de relancer l’enregistrement.
+
+    Pour les encodeurs matériels, ce problème est probablement dû à un bug du noyau Linux ou du pilote du périphérique. Veuillez signaler ce problème aux mainteneurs de votre appareil en incluant le nom de l’encodeur ainsi que les détails de l’erreur.
+
+    L’enregistrement est peut-être incomplet.
+
+    Erreur : { $error }
+recording-error-dismiss = Fermer
+shutdown-pending-saves =
+    { $count ->
+        [0] Arrêt en cours
+        [one] 1 enregistrement de photo/vidéo en cours
+       *[other] { $count } enregistrements de photo/vidéo en cours
+    }
+settings-motion-photo = Photo animée
+settings-motion-photo-description = Conservez en permanence une courte séquence vidéo en mémoire avec l’encodeur vidéo sélectionné. Enregistrez les photos JPEG/AVIF avec 1,25 seconde de vidéo avant et après le déclenchement. Non disponible en PNG/DNG ; votre préférence est conservée lorsque vous changez de format.
+settings-audio-encoder-description = S’applique uniquement aux enregistrements vidéo. Les photos animées utilisent toujours AAC, conformément aux spécifications Android relatives aux photos animées.
+no-camera-available = Aucune caméra disponible
+settings-demosaicing = Dématriçage
+settings-demosaicing-description = Algorithme utilisé pour reconstruire les couleurs dans les photos RAW
+insights-v4l2-in-backend = Disponible dans { $backend }
+insights-v4l2-active-in-backend = Actif dans { $backend }
+insights-v4l2-not-in-backend = Non disponible dans { $backend }
+insights-frame-copy-time = Temps de copie du tampon d’image
+insights-preview-delivery-drops = Images perdues dans l’aperçu
