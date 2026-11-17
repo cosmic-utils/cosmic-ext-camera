@@ -11784,14 +11784,14 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/zbus/zbus-6.2.1.crate",
-        "sha256": "0ddb2961d9587ef9f24ad14cde1c3bc4c5edc9f1525932a8cffdd5bd98886eb9",
-        "dest": "cargo/vendor/zbus-6.2.1"
+        "url": "https://static.crates.io/crates/zbus/zbus-6.3.0.crate",
+        "sha256": "6b4aae740b23927ceabed962431abab2cdefb9f7f885e5bbab062da09bf580e4",
+        "dest": "cargo/vendor/zbus-6.3.0"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"0ddb2961d9587ef9f24ad14cde1c3bc4c5edc9f1525932a8cffdd5bd98886eb9\", \"files\": {}}",
-        "dest": "cargo/vendor/zbus-6.2.1",
+        "contents": "{\"package\": \"6b4aae740b23927ceabed962431abab2cdefb9f7f885e5bbab062da09bf580e4\", \"files\": {}}",
+        "dest": "cargo/vendor/zbus-6.3.0",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -11836,14 +11836,14 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/zbus_macros/zbus_macros-6.2.1.crate",
-        "sha256": "083b38add47c340fc12ec560124fb1d9c23acb584f7021099f85ec6587a03c54",
-        "dest": "cargo/vendor/zbus_macros-6.2.1"
+        "url": "https://static.crates.io/crates/zbus_macros/zbus_macros-6.3.0.crate",
+        "sha256": "37c9dd4beaf145c16fcb2902862f50da86e54aed13dd368ddf64a1d17e6b8529",
+        "dest": "cargo/vendor/zbus_macros-6.3.0"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"083b38add47c340fc12ec560124fb1d9c23acb584f7021099f85ec6587a03c54\", \"files\": {}}",
-        "dest": "cargo/vendor/zbus_macros-6.2.1",
+        "contents": "{\"package\": \"37c9dd4beaf145c16fcb2902862f50da86e54aed13dd368ddf64a1d17e6b8529\", \"files\": {}}",
+        "dest": "cargo/vendor/zbus_macros-6.3.0",
         "dest-filename": ".cargo-checksum.json"
     },
     {
