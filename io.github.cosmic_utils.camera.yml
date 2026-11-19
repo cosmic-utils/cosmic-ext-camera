@@ -26,7 +26,8 @@ finish-args:
   - --filesystem=xdg-pictures:rw
   - --filesystem=xdg-videos:rw
   # flathub-linter: skip=finish-args-unnecessary-xdg-config-cosmic-rw-access
-  - --filesystem=xdg-config/cosmic:rw
+  # Create the host directory so libcosmic's HOME/.config writes persist.
+  - --filesystem=xdg-config/cosmic:create
   # PipeWire access for camera and audio
   - --filesystem=xdg-run/pipewire-0:ro
   # PulseAudio access (PipeWire's PulseAudio compatibility layer for pulsesrc)
