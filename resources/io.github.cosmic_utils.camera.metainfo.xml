@@ -29,6 +29,7 @@
   <summary xml:lang="hu">Fotók készítése és videók rögzítése</summary>
   <summary xml:lang="pl">Uwieczniaj zdjęcia i filmy</summary>
   <summary xml:lang="pt-BR">Capture fotos, vídeos e códigos QR</summary>
+  <summary xml:lang="ru">Камера для фото, видео и QR‑кодов</summary>
   <summary xml:lang="sv">Ta foton och videor</summary>
   <summary xml:lang="uk">Знімайте фото та відео</summary>
   <summary xml:lang="zh-CN">拍摄照片和视频</summary>
@@ -64,6 +65,7 @@
     <p xml:lang="hu">Főbb funkciók:</p>
     <p xml:lang="pl">Zasadnicze cechy:</p>
     <p xml:lang="pt-BR">Principais características:</p>
+    <p xml:lang="ru">Основные возможности:</p>
     <p xml:lang="sv">Nyckelfunktioner:</p>
     <p xml:lang="uk">Основні можливості:</p>
     <p xml:lang="zh-CN">主要功能：</p>
@@ -341,6 +343,7 @@
       <caption xml:lang="hu">QR-kód felismerése</caption>
       <caption xml:lang="pl">Wykrywanie kodów QR</caption>
       <caption xml:lang="pt-BR">Detecção de código QR</caption>
+      <caption xml:lang="ru">Распознавание QR‑кода</caption>
       <caption xml:lang="sv">QR-kodidentifiering</caption>
       <caption xml:lang="uk">Виявлення QR-коду</caption>
       <caption xml:lang="zh-CN">二维码检测</caption>
@@ -373,6 +376,7 @@
       <caption xml:lang="hu">Speciális beállítások</caption>
       <caption xml:lang="pl">Zaawansowane ustawienia</caption>
       <caption xml:lang="pt-BR">Configurações avançadas</caption>
+      <caption xml:lang="ru">Расширенные настройки</caption>
       <caption xml:lang="sv">Avancerade inställningar</caption>
       <caption xml:lang="uk">Розширені налаштування</caption>
       <caption xml:lang="zh-CN">高级设置</caption>
