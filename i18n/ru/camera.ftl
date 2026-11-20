@@ -118,7 +118,7 @@ tools-color = Цвет
 tools-filter = Фильтр
 tools-motor = Мотор
 ptz-title = Управление камерой
-ptz-pan = Поворот
+ptz-pan = Панорамирование
 ptz-tilt = Наклон
 privacy-cover-closed = Шторка приватности закрыта
 privacy-cover-hint = Откройте шторку приватности чтобы использовать камеру
@@ -187,6 +187,147 @@ indicator-res = RES
 exposure-ev = EV
 exposure-iso = ISO
 settings-demosaicing = Демаскинг
-insights-meta-na = Недоступно
+insights-meta-na = Нет данных
 settings-timelapse = Таймлапс
 settings-timelapse-interval = Интервал
+insights-title = Аналитика
+insights-pipeline = Конвейер
+insights-pipeline-full-libcamera = Конвейер
+insights-backend = Подсистема
+insights-backend-type = Тип
+insights-libcamera-version = Версия libcamera
+insights-sensor-model = Сенсор
+insights-format-resolution = Разрешение
+insights-format-framerate = Частота кадров
+insights-stream-pixel-format = Формат пикселей
+insights-stream-frame-count = Кадров
+insights-multistream-dual = Два потока
+insights-multistream-single = Один поток
+insights-multistream-source-shared = Предпросмотр и съёмка
+insights-multistream-source-separate = Предпросмотр / Съёмка
+insights-stream-preview = Поток предпросмотра
+insights-stream-capture = Поток съёмки
+insights-stream-role = Роль
+insights-stream-resolution = Разрешение
+insights-mjpeg-decoder = Декодер MJPEG
+insights-recording = Конвейер записи
+insights-recording-mode = Режим
+insights-recording-encoder = Кодер
+insights-recording-resolution = Разрешение
+insights-audio-device = Устройство
+insights-audio-node = Узел
+insights-audio-codec = Кодек
+insights-audio-channels = Каналы
+insights-audio-default = (По умолчанию)
+insights-audio-mono = Моно
+insights-audio-pipeline = Конвейер
+insights-audio-format = Формат
+insights-audio-inputs = Входные каналы
+insights-metadata = Метаданные кадра
+insights-meta-exposure = Экспозиция
+insights-meta-colour-temp = Цветовая температура
+insights-meta-black-level = Уровень чёрного
+settings-timelapse-interval-description = Время между последовательными снимками
+insights-v4l2-in-backend = Доступно в { $backend }
+insights-v4l2-active-in-backend = Активно в { $backend }
+insights-v4l2-not-in-backend = Недоступно в { $backend }
+insights-capture = Съёмка
+insights-capture-burst = Серийная съёмка
+shortcut-category-capture = Съёмка
+shortcut-category-display = Дисплей
+action-capture = Съёмка / Запись / Воспроизведение-Пауза
+action-photo-snapshot = Фото во время записи
+action-switch-camera = Переключить камеру
+action-toggle-focus-auto = Переключить автофокус
+action-toggle-flash = Переключить вспышку
+action-toggle-tools-menu = Панель инструментов
+action-toggle-exposure-picker = Выбор экспозиции
+action-toggle-format-picker = Переключить формат
+action-toggle-filters = Выбор фильтра
+keybindings-page-reset-all = Сбросить всё до значений по умолчанию
+keybindings-record-title = Нажмите сочетание клавиш
+keybindings-record-hint = Нажмите желаемое сочетание клавиш или Esc для отмены
+keybindings-record-conflict = Это сочетание уже использует "{ $other }". Заменить?
+keybindings-record-replace = Заменить
+desktop-comment = Делайте фотографии, записывайте видео и сканируйте QR-коды
+desktop-keywords = camera;webcam;photo;video;камера;вебкамера;фото;видео;
+settings-motion-photo-description = Непрерывно буферизирует короткий видеофрагмент в памяти с помощью выбранного видеокодера. Сохраняет фото в форматах JPEG/AVIF с отрезком по 1,25 секунды до и после срабатывания затвора. Функция недоступна для PNG/DNG; выбранное состояние сохраняется при переключении форматов.
+settings-motion-photo = Фото с эффектом движения
+toggle-motion-on = Движение ВКЛ
+toggle-motion-off = Движение ВЫКЛ
+toggle-hdr-on = HDR ВКЛ
+toggle-hdr-off = HDR ВЫКЛ
+insights-frame-size-decoded = Размер кадра
+insights-format-source = Источник
+insights-available = Доступно
+insights-unavailable = Недоступно
+insights-format-wgpu = Обработка на GPU
+insights-cpu-processing = Обработка на CPU
+insights-cpu-decode-time = Время декодирования на CPU
+insights-gpu-upload-time = Время передачи в GPU
+insights-gpu-upload-bandwidth = Пропускная способность передачи в GPU
+insights-frame-latency = Задержка кадра
+insights-selected = Выбрано
+insights-audio-enabled = Включено
+insights-audio-disabled = Выключено
+insights-audio-recording = Запись
+insights-audio = Аудио
+insights-recording-pipeline = Конвейер
+insights-recording-channel = Канал
+insights-recording-capture = Поток захвата
+insights-recording-delay = Задержка обработки
+insights-recording-fps = Фактический FPS
+insights-recording-pts = Текущий PTS
+insights-audio-output-level = Выходной уровень
+insights-meta-sequence = Номер кадра
+insights-meta-lens-position = Позиция линзы
+insights-meta-focus-fom = Показатель качества фокусировки
+insights-meta-lux = Освещённость
+metainfo-feature-capture = Съёмка фото и видео: высокое качество и аппаратное ускорение
+insights-meta-digital-gain = Цифровое усиление
+insights-meta-analogue-gain = Аналоговое усиление
+recording-error-body =
+    Видеокодер "{ $encoder }" Вышел из строя или перестал отвечать.
+
+    Перезапустите ваше устройство. После перезапуска выберите другой видеокодер в меню Настройки > Видео перед повторной записью.
+
+    Для аппаратных кодеров это, скорее всего, ошибка ядра Linux или драйвера устройства. Пожалуйста, сообщите о проблеме в поддержку и указав название кодера и сведения об ошибке.
+
+    Запись может быть неполной.
+
+    Ошибка: { $error }
+recording-error-dismiss = Отклонить
+shutdown-pending-saves =
+    { $count ->
+        [0] Завершение работы
+        [one] 1 файл ожидает сохранения
+        [few] { $count } файла ожидают сохранения
+       *[other] { $count } файлов ожидают сохранения
+    }
+insights-stream-combined = Предпросмотр + съёмка
+insights-format-native = Собственный формат
+insights-pipeline-handler = Обработчик конвейера
+insights-recording-pusher = Модуль проталкивания данных в appsrc
+insights-recording-convert = Конвертация NV12
+insights-meta-colour-gains = Усиление баланса белого (R, B)
+shortcut-category-pickers = Элементы выбора
+action-toggle-color-picker = Настройка цвета
+action-toggle-motor-picker = Панель управления камерой
+shortcuts-help-unbound = —
+metainfo-description-intro = { camera } это современное приложение для работы с камерами в Linux, созданное как для настольных компьютеров, так и для телефонов. Сделайте быстрый снимок, запишите видео или отсканируйте QR‑код: интерфейс { camera } продуман так, чтобы не отвлекать вас от главного.
+metainfo-description-usage = Просто откройте приложение и начните запечатлевать моменты. Добавляйте забавные фильтры к своим фотографиям, сканируйте QR-коды, чтобы открывать ссылки или подключаться к Wi-Fi, или используйте режим виртуальной камеры, чтобы отлично выглядеть во время видеозвонков, применив любимый фильтр.
+recording-error-title = Сбой видеокодера
+recording-error-automatic = Автоматический видеокодер
+insights-decoder-chain = Цепочка резервных декодеров
+metainfo-feature-modes = Режимы фото, видео и покадровой съемки с автоспуском и руководствами по композиции
+metainfo-feature-controls = Ручное управление экспозицией, ISO, затвором, фокусировкой и балансом белого
+metainfo-feature-qr = Сканер QR-кода: открывайте ссылки, подключайтесь к Wi-Fi и многое другое
+metainfo-feature-filters = 14 фильтров для творчества: { filter-mono }, { filter-sepia }, { filter-vivid }, { filter-noir }, { filter-pencil } и другие
+metainfo-feature-virtual-camera = Виртуальная камера: используйте обработанный видеопоток в видеозвонках и других приложениях
+metainfo-feature-multi-camera = Поддержка нескольких камер: легкое переключение между камерами и микрофонами
+metainfo-caption-photo-tools = Фоторежим с меню инструментов
+metainfo-caption-phone = Фоторежим на телефоне с Linux
+metainfo-caption-filters = Выбор фильтра
+metainfo-caption-recording = Процесс записи видео
+insights-frame-copy-time = Время копирования кадра
+insights-preview-delivery-drops = Потери кадров в предпросмотре
