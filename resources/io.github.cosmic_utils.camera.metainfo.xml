@@ -42,6 +42,7 @@
     <p xml:lang="hu">A Kamera egy modern kameraalkalmazás Linuxra, amely asztali számítógépekre és telefonokra egyaránt készült. Akár gyorsan szeretnél fotót készíteni, videót rögzíteni vagy QR-kódot beolvasni, a Kamera letisztult és könnyen használható felületet biztosít, amely nem vonja el a figyelmet.</p>
     <p xml:lang="pl">Aparat jest nowoczesną aplikacją aparatu dla Linuxa, zbudowaną zarówno dla komputerów i telefonów. Jeśli masz ochotę zrobić szybkie zdjęcie, nagrać film lub zeskanować kod QR, Aparat dostarcza przejrzystego i intuicyjnego interfejsu który Ci w tym nie przeszkadza.</p>
     <p xml:lang="pt-BR">O Câmera é um aplicativo de câmera moderno para Linux, desenvolvido para desktops e celulares. Seja para tirar uma foto rápida, gravar um vídeo ou escanear um código QR, o Câmera oferece uma interface limpa e intuitiva que não interfere na sua experiência.</p>
+    <p xml:lang="ru">Камера это современное приложение для работы с камерами в Linux, созданное как для настольных компьютеров, так и для телефонов. Сделайте быстрый снимок, запишите видео или отсканируйте QR‑код: интерфейс Камера продуман так, чтобы не отвлекать вас от главного.</p>
     <p xml:lang="sv">Kamera är ett modernt kamera program för Linux, byggt för både stationära datorer och telefoner. Oavsett om du behöver ta ett snabbt foto, spela in en video eller skanna en QR-kod, så gerKamera dig ett rent och intuitivt gränssnitt som håller sig ur vägen.</p>
     <p xml:lang="uk">Камера — це сучасний застосунок камери для Linux, розроблений як для стільниць, так і для телефонів. Чи потрібно швидко зробити знімок, записати відео, чи відсканувати QR-код, Камера пропонує чистий та інтуїтивно зрозумілий інтерфейс, який не відвертає увагу.</p>
     <p xml:lang="zh-CN">相机 是个现代 Linux 相机应用程序。专为电脑与手机设计。无论您需要快速拍照、录制视频还是扫描二维码，相机 能提供简洁直观的界面，不妨碍您的操作。</p>
@@ -53,6 +54,7 @@
     <p xml:lang="hu">Csak nyisd meg az alkalmazást, és kezdd el megörökíteni a pillanatokat. Tegyél kreatív szűrőket a fotóidra, olvass be QR-kódokat hivatkozások megnyitásához vagy Wi-Fi-hálózatokhoz való kapcsolódáshoz, illetve használd a virtuális kamera módot, hogy kedvenc szűrőddel jelenj meg videóhívásokban.</p>
     <p xml:lang="pl">Po prostu otwórz aplikację i uwiecznij chwilę. Dodaj zabawne filtry do Twoich zdjęć, skanuj kody QR by otwierać linki lub łączyć się z WiFi, lub użyj wirtualnego aparatu by wyglądać bajecznie w wideorozmowach ze swoimi ulubionymi filtrami.</p>
     <p xml:lang="pt-BR">Basta abrir o aplicativo e começar a capturar momentos. Adicione filtros divertidos às suas fotos, escaneie códigos QR para abrir links ou conectar-se ao Wi-Fi, ou use o modo de câmera virtual para ficar incrível em videochamadas com seu filtro favorito aplicado.</p>
+    <p xml:lang="ru">Просто откройте приложение и начните запечатлевать моменты. Добавляйте забавные фильтры к своим фотографиям, сканируйте QR-коды, чтобы открывать ссылки или подключаться к Wi-Fi, или используйте режим виртуальной камеры, чтобы отлично выглядеть во время видеозвонков, применив любимый фильтр.</p>
     <p xml:lang="sv">Öppna bara programmet och börja fånga ögonblicken. Lägg till roliga filter till dina foton, skanna QR-koder för att öppna länkar eller ansluta till WiFi, eller använd virtuellt kameraläge för att se bra ut i videosamtal med ditt favoritfilter.</p>
     <p xml:lang="uk">Просто відкрийте застосунок і починайте творити. Застосовуйте креативні фільтри до знімків, миттєво скануйте QR-коди для переходу за посиланнями чи підключення до Wi-Fi, або скористайтеся режимом віртуальної камери, щоб виглядати бездоганно у відеодзвінках з улюбленим фільтром.</p>
     <p xml:lang="zh-CN">只需打开应用程序即可开始捕捉精彩瞬间。 为照片添加有趣的滤镜，扫描二维码打开链接或连接 WiFi， 或使用虚拟相机模式在视频通话中应用您喜爱的滤镜，展现最佳状态。</p>
@@ -78,6 +80,7 @@
       <li xml:lang="hu">Fotó- és videórögzítés: kiváló minőségben, hardveres gyorsítással</li>
       <li xml:lang="pl">Uwiecznianie zdjęć i filmów: wysoka jakość i przyśpieszenie sprzętowe</li>
       <li xml:lang="pt-BR">Captura de fotos e vídeos: alta qualidade e aceleração por hardware</li>
+      <li xml:lang="ru">Съёмка фото и видео: высокое качество и аппаратное ускорение</li>
       <li xml:lang="sv">Foto och videoinspelning: hög kvalitet och hårdvaruaccelererad</li>
       <li xml:lang="uk">Знімки та відеозйомка: висока якість і апаратне прискорення</li>
       <li xml:lang="zh-CN">照片和视频捕捉：高质量且支持硬件加速</li>
@@ -89,6 +92,7 @@
       <li xml:lang="hu">Fotó-, videó- és time-lapse módok önkioldóval és kompozíciós segédvonalakkal</li>
       <li xml:lang="pl">Zdjęcia, filmy i tryb filmu poklatkowego, z własnym stoperem i przewodnikiem po regułach kompozycji</li>
       <li xml:lang="pt-BR">Modos de foto, vídeo e timelapse, com temporizador automático e guias de composição</li>
+      <li xml:lang="ru">Режимы фото, видео и покадровой съемки с автоспуском и руководствами по композиции</li>
       <li xml:lang="sv">Foto, video- och timelapse-lägen, med självutlösare och kompositionsguider</li>
       <li xml:lang="uk">Режими фото, відео та прискорення, з таймером і напрямними композиції</li>
       <li xml:lang="zh-CN">照片、视频与延时摄影模式，并带有自拍定时气器和构图指南</li>
@@ -100,6 +104,7 @@
       <li xml:lang="hu">Kézi vezérlők: expozíció, ISO, záridő, fókusz és fehéregyensúly</li>
       <li xml:lang="pl">Ręczne sterowanie: czas naświetlenia, ISO, migawka, skupienie oraz balans bieli</li>
       <li xml:lang="pt-BR">Controles manuais: exposição, ISO, disparador, foco e balanço de branco</li>
+      <li xml:lang="ru">Ручное управление экспозицией, ISO, затвором, фокусировкой и балансом белого</li>
       <li xml:lang="sv">Manuella kontroller: exponering, ISO, slutare, fokus och vitbalans</li>
       <li xml:lang="uk">Ручне керування: експозиція, ISO, витримка, фокус і баланс білого</li>
       <li xml:lang="zh-CN">手动控制：曝光、ISO、快门、聚焦和白平衡</li>
@@ -111,6 +116,7 @@
       <li xml:lang="hu">QR-kód olvasó: hivatkozások megnyitása, Wi-Fi-hálózatokhoz kapcsolódás és egyebek</li>
       <li xml:lang="pl">Skaner kodów QR: otwieraj linki, połącz z Wifi i nie tylko</li>
       <li xml:lang="pt-BR">Leitor de código QR: abra links, conecte-se ao Wi-Fi e muito mais</li>
+      <li xml:lang="ru">Сканер QR-кода: открывайте ссылки, подключайтесь к Wi-Fi и многое другое</li>
       <li xml:lang="sv">QR-kodskanner: öppna länkar, anslut till WiFi och mer</li>
       <li xml:lang="uk">Сканер QR-кодів: відкривайте посилання, підключайтеся до Wi-Fi та багато іншого</li>
       <li xml:lang="zh-CN">二维码扫描器：打开链接、连接 WiFi 等</li>
@@ -122,6 +128,7 @@
       <li xml:lang="hu">14 kreatív szűrő: Monokróm, Szépia, Élénk, Noir, Ceruza és még sok más</li>
       <li xml:lang="pl">14 creatywnych filtrów: Mono,Sepia,Żywe,Noir,Rysowanie, i nie tylko</li>
       <li xml:lang="pt-BR">14 filtros criativos: Mono, Sépia, Vívido, Noir, Lápis e muito mais</li>
+      <li xml:lang="ru">14 фильтров для творчества: Моно, Сепия, Яркий, Нуар, Карандаш и другие</li>
       <li xml:lang="sv">14 kreativa filter: Mono, Sepia, Levande, Noir, Penna, och mer</li>
       <li xml:lang="uk">14 креативних фільтрів: Моно, Сепія, Насичений, Нуар, Нарис та інші</li>
       <li xml:lang="zh-CN">14 种创意滤镜：单色、棕褐色、鲜艳、黑色电影、铅笔等</li>
@@ -133,6 +140,7 @@
       <li xml:lang="hu">Virtuális kamera: használd a szűrt kameraképet videóhívásokban és más alkalmazásokban</li>
       <li xml:lang="pl">Wirtualny aparat: użyj swój filtrowany zapis z aparatu w wideorozmowach i innych aplikacjach</li>
       <li xml:lang="pt-BR">Câmera virtual: use a imagem com filtro da sua câmera em videochamadas e outros aplicativos</li>
+      <li xml:lang="ru">Виртуальная камера: используйте обработанный видеопоток в видеозвонках и других приложениях</li>
       <li xml:lang="sv">Virtuell kamera: använd ditt filtrerade kameraflöde i videosamtal och andra program</li>
       <li xml:lang="uk">Віртуальна камера: використовуйте відфільтроване зображення у відеодзвінках та інших застосунках</li>
       <li xml:lang="zh-CN">虚拟相机：在视频通话和其他应用中使用带滤镜的摄像头画面</li>
@@ -144,6 +152,7 @@
       <li xml:lang="hu">Többkamerás támogatás: egyszerű váltás a kamerák és mikrofonok között</li>
       <li xml:lang="pl">Wsparcie dla wielu aparatów: zmieniaj z łatwością pomiędzy aparatami i mikrofonami</li>
       <li xml:lang="pt-BR">Suporte para múltiplas câmeras: alterne facilmente entre câmeras e microfones</li>
+      <li xml:lang="ru">Поддержка нескольких камер: легкое переключение между камерами и микрофонами</li>
       <li xml:lang="sv">Stöd för flera kameror: enkelt växla mellan kameror och mikrofoner</li>
       <li xml:lang="uk">Підтримка кількох камер: легко перемикайтеся між камерами та мікрофонами</li>
       <li xml:lang="zh-CN">多摄像头支持：轻松切换摄像头和麦克风</li>
@@ -216,6 +225,7 @@
       <caption xml:lang="hu">Fotómód megnyitott eszközmenüvel</caption>
       <caption xml:lang="pl">Tryb zdjęciowy z menu narzędziowym</caption>
       <caption xml:lang="pt-BR">Modo foto com menu de ferramentas</caption>
+      <caption xml:lang="ru">Фоторежим с меню инструментов</caption>
       <caption xml:lang="sv">Fotoläge med verktygsmeny</caption>
       <caption xml:lang="uk">Режим фото з панеллю інструментів</caption>
       <caption xml:lang="zh-CN">带有工具菜单的拍照模式</caption>
@@ -247,6 +257,7 @@
       <caption xml:lang="hu">Fotómód linuxos telefonon</caption>
       <caption xml:lang="pl">Tryb zdjęciowy na telefonie z Linuxem</caption>
       <caption xml:lang="pt-BR">Modo foto em um telefone Linux</caption>
+      <caption xml:lang="ru">Фоторежим на телефоне с Linux</caption>
       <caption xml:lang="sv">Fotoläge med en Linux telefon</caption>
       <caption xml:lang="uk">Режим знімку на Linux-телефоні</caption>
       <caption xml:lang="zh-CN">Linux 手机的拍照模式</caption>
@@ -279,6 +290,7 @@
       <caption xml:lang="hu">Szűrőválasztó</caption>
       <caption xml:lang="pl">Wybór filtrów</caption>
       <caption xml:lang="pt-BR">Seletor de filtros</caption>
+      <caption xml:lang="ru">Выбор фильтра</caption>
       <caption xml:lang="sv">Filterväljare</caption>
       <caption xml:lang="uk">Вибір фільтрів</caption>
       <caption xml:lang="zh-CN">滤镜选择器</caption>
@@ -311,6 +323,7 @@
       <caption xml:lang="hu">Folyamatban lévő videófelvétel</caption>
       <caption xml:lang="pl">Trwa nagrywanie filmu</caption>
       <caption xml:lang="pt-BR">Gravação de vídeo em andamento</caption>
+      <caption xml:lang="ru">Процесс записи видео</caption>
       <caption xml:lang="sv">Videoinspelning pågår</caption>
       <caption xml:lang="uk">Запис відео триває</caption>
       <caption xml:lang="zh-CN">视频录制中</caption>
