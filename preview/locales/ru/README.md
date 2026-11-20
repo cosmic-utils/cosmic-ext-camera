@@ -2,17 +2,13 @@
 
 # Камера (ru)
 
-*Camera for photos, videos and QR codes.*
+*Камера для фото, видео и QR‑кодов.*
 
 |  |  |
 | :---: | :---: |
-| ![Photo mode with tools menu](preview-001.png)<br>**Photo mode with tools menu** | ![Photo mode on a Linux phone](preview-002.png)<br>**Photo mode on a Linux phone** |
-| ![Filter picker](preview-003.png)<br>**Filter picker** | ![Video recording in progress](preview-004.png)<br>**Video recording in progress** |
-| ![QR code detection](preview-005.png)<br>**QR code detection** | ![Advanced settings](preview-006.png)<br>**Advanced settings** |
-
-> 6 of 6 captions are not translated into `ru` yet
-> and are shown in English. Translations are welcome in
-> [`i18n/ru/camera.ftl`](../../../i18n/ru/camera.ftl).
+| ![Фоторежим с меню инструментов](preview-001.png)<br>**Фоторежим с меню инструментов** | ![Фоторежим на телефоне с Linux](preview-002.png)<br>**Фоторежим на телефоне с Linux** |
+| ![Выбор фильтра](preview-003.png)<br>**Выбор фильтра** | ![Процесс записи видео](preview-004.png)<br>**Процесс записи видео** |
+| ![Распознавание QR‑кода](preview-005.png)<br>**Распознавание QR‑кода** | ![Расширенные настройки](preview-006.png)<br>**Расширенные настройки** |
 
 ---
 
