@@ -11771,14 +11771,14 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/zbus/zbus-6.4.0.crate",
-        "sha256": "970c652becf38216d39997ec1335d57bcf7fc7de8ac6447c576de5951d894ec1",
-        "dest": "cargo/vendor/zbus-6.4.0"
+        "url": "https://static.crates.io/crates/zbus/zbus-6.5.0.crate",
+        "sha256": "9a7f9f5dd97fa527c1202ba1cb35d48e07f77d4de8542317c854f7aef22b0668",
+        "dest": "cargo/vendor/zbus-6.5.0"
     },
     {
         "type": "inline",
-        "contents": "{\"package\": \"970c652becf38216d39997ec1335d57bcf7fc7de8ac6447c576de5951d894ec1\", \"files\": {}}",
-        "dest": "cargo/vendor/zbus-6.4.0",
+        "contents": "{\"package\": \"9a7f9f5dd97fa527c1202ba1cb35d48e07f77d4de8542317c854f7aef22b0668\", \"files\": {}}",
+        "dest": "cargo/vendor/zbus-6.5.0",
         "dest-filename": ".cargo-checksum.json"
     },
     {
