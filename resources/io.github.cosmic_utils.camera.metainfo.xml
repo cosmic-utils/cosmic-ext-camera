@@ -24,6 +24,7 @@
   <summary>Camera for photos, videos and QR codes</summary>
   <summary xml:lang="cs">Pořizujte fotografie a videa</summary>
   <summary xml:lang="de">Kamera für Fotos, Videos und QR-Codes</summary>
+  <summary xml:lang="es">Cámara para fotos, vídeos y códigos QR</summary>
   <summary xml:lang="fi">Kamera kuville, videoille sekä QR-koodeille</summary>
   <summary xml:lang="fr">Prendre des photos et vidéos</summary>
   <summary xml:lang="hu">Fotók készítése és videók rögzítése</summary>
@@ -99,6 +100,7 @@
       <li>Manual controls: exposure, ISO, shutter, focus and white balance</li>
       <li xml:lang="cs">Manuální ovládání: expozice, ISO, závěrka, ostření a vyvážení bílé</li>
       <li xml:lang="de">Manuelle Steuerung: Belichtung, ISO, Verschlusszeit, Fokus und Weißabgleich</li>
+      <li xml:lang="es">Controles manuales: exposición, ISO, velocidad de obturación, enfoque y balance de blancos</li>
       <li xml:lang="fi">Manuaalinen hallinta: altistus, ISO, suljin, kohdennus sekä valkotasapaino</li>
       <li xml:lang="fr">Commandes manuelles : exposition, ISO, vitesse d'obturation, mise au point et balance des blancs</li>
       <li xml:lang="hu">Kézi vezérlők: expozíció, ISO, záridő, fókusz és fehéregyensúly</li>
@@ -123,6 +125,7 @@
       <li>14 creative filters: Mono, Sepia, Vivid, Noir, Pencil, and more</li>
       <li xml:lang="cs">14 kreativních filtrů: Černobílý, Sépie, Živý, Noir, Skica a další</li>
       <li xml:lang="de">14 kreative Filter: Mono, Sepia, Lebhaft, Noir, Skizze und mehr</li>
+      <li xml:lang="es">14 filtros creativos; Mono, Sepia, Vívido, Negro, Lápiz, y más</li>
       <li xml:lang="fi">14 eri suodatinta: Mono,Seepia,Eläväinen,Noir,Lyijy, sekä muita</li>
       <li xml:lang="fr">14 filtres créatifs : Mono, Sépia, Vif, Noir, Crayon, et bien plus encore</li>
       <li xml:lang="hu">14 kreatív szűrő: Monokróm, Szépia, Élénk, Noir, Ceruza és még sok más</li>
