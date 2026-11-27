@@ -951,6 +951,7 @@ mod tests {
         (
             PipelineSharedState {
                 zoom: Default::default(),
+                focus: Default::default(),
                 frame_sender,
                 still_capture: Default::default(),
                 recording_sender: Arc::new(Mutex::new(None)),

@@ -28,6 +28,7 @@ const CAPTURE_COPY_POOL_CACHE_CAPACITY: usize =
 /// Parameters passed to the capture thread for initialization
 pub(crate) struct CaptureThreadParams {
     pub(crate) zoom: Arc<crate::backends::camera::zoom::ZoomControl>,
+    pub(crate) focus: Arc<crate::backends::camera::focus::FocusControl>,
     pub(crate) camera_id: String,
     pub(crate) preview_metrics: Arc<PreviewMetrics>,
     pub(crate) preview_width: u32,
@@ -356,14 +357,28 @@ fn requeue_request(
     mut req: libcamera::request::Request,
     stop_flag: &AtomicBool,
     zoom: &crate::backends::camera::zoom::ZoomControl,
+    focus: &crate::backends::camera::focus::FocusControl,
     scaler_crop: &mut NativeScalerCrop,
 ) {
     // Request::reuse clears controls. Reapply even when resetting to 1x.
     scaler_crop.apply(req.controls_mut(), zoom);
+    apply_focus_trigger(req.controls_mut(), focus);
     if let Err((_, e)) = cam.queue_request(req)
         && !stop_flag.load(Ordering::Acquire)
     {
         warn!(error = %e, "Failed to re-queue request");
+    }
+}
+
+/// Put a pending autofocus scan request on a request as AfTrigger::Start.
+/// Cameras without autofocus reject the control; that is harmless.
+fn apply_focus_trigger(
+    controls: &mut libcamera::control::ControlList,
+    focus: &crate::backends::camera::focus::FocusControl,
+) {
+    if focus.take_scan_request() {
+        let _ = controls.set(libcamera::controls::AfTrigger::Start);
+        debug!("Autofocus scan triggered");
     }
 }
 
@@ -773,6 +788,7 @@ fn capture_thread_setup_and_run(
     // Queue all requests
     for mut req in requests {
         scaler_crop.apply(req.controls_mut(), &params.zoom);
+        apply_focus_trigger(req.controls_mut(), &params.focus);
         if let Err((_, e)) = active_cam.queue_request(req) {
             error!(error = %e, "Failed to queue initial request");
         }
@@ -1134,6 +1150,7 @@ fn run_capture_loop(
                 req,
                 &params.stop_flag,
                 &params.zoom,
+                &params.focus,
                 scaler_crop,
             );
             continue;
@@ -1183,6 +1200,7 @@ fn run_capture_loop(
                         req,
                         &params.stop_flag,
                         &params.zoom,
+                        &params.focus,
                         scaler_crop,
                     );
                     continue;
@@ -1314,6 +1332,7 @@ fn run_capture_loop(
             req,
             &params.stop_flag,
             &params.zoom,
+            &params.focus,
             scaler_crop,
         );
     }
@@ -1437,7 +1456,12 @@ fn extract_metadata(req: &libcamera::request::Request) -> FrameMetadata {
             .get::<controls::SensorTimestamp>()
             .ok()
             .map(|v| v.0 as u64),
-        af_state: None,
+        af_state: meta.get::<controls::AfState>().ok().map(|state| match state {
+            controls::AfState::Idle => AfState::Idle,
+            controls::AfState::Scanning => AfState::Scanning,
+            controls::AfState::Focused => AfState::Focused,
+            controls::AfState::Failed => AfState::Failed,
+        }),
         ae_state: None,
         awb_state: None,
         colour_gains: meta.get::<controls::ColourGains>().ok().map(|v| v.0),
@@ -2012,6 +2036,7 @@ mod tests {
     ) -> super::CaptureThreadParams {
         super::CaptureThreadParams {
             zoom: Default::default(),
+            focus: Default::default(),
             camera_id: "native-dispatch-metrics-test".into(),
             preview_metrics,
             preview_width: 2,

@@ -15,6 +15,7 @@ pub(crate) mod pipewire;
 pub(crate) mod preview_metrics;
 pub mod recording;
 pub(crate) mod still_capture;
+pub mod focus;
 pub mod synthetic;
 pub mod types;
 mod usb_name;

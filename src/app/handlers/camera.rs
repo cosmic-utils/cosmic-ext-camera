@@ -452,7 +452,10 @@ impl AppModel {
         self.current_frame = Some(frame);
         self.current_frame_is_file_source = is_file_source;
         self.current_frame_rotation = frame_rotation;
-        Task::batch([exposure_task, qr_task])
+        match self.take_focus_deferred_capture() {
+            Some(capture_task) => Task::batch([exposure_task, qr_task, capture_task]),
+            None => Task::batch([exposure_task, qr_task]),
+        }
     }
 
     pub(crate) fn handle_cameras_initialized(
