@@ -2,7 +2,7 @@
 
 # Cámara (es)
 
-*Camera for photos, videos and QR codes.*
+*Cámara para fotos, vídeos y códigos QR.*
 
 |  |  |
 | :---: | :---: |
