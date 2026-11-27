@@ -233,3 +233,86 @@ desktop-keywords = cámara;webcam;foto;vídeo;
 metainfo-summary = Cámara para fotos, vídeos y códigos QR
 metainfo-feature-controls = Controles manuales: exposición, ISO, velocidad de obturación, enfoque y balance de blancos
 metainfo-feature-filters = 14 filtros creativos; { filter-mono }, { filter-sepia }, { filter-vivid }, { filter-noir }, { filter-pencil }, y más
+toggle-motion-on = MOVIMIENTO ACTIVADO
+toggle-motion-off = MOVIMIENTO APAGADO
+toggle-hdr-on = HDR ENCENDIDO
+toggle-hdr-off = HDR APAGADO
+mode-timelapse = Cámara rápida
+recording-error-body =
+    El codificador de vídeo "{ $encoder }" falló o dejó de responder.
+
+    Reinicie su dispositivo. Tras reiniciarlo, seleccione un codificador de vídeo diferente en Ajustes > Vídeo antes de volver a grabar.
+
+    En el caso de los codificadores de hardware, es probable que se trate de un error del kernel de Linux o del controlador del dispositivo. Por favor, informe del problema a los responsables del mantenimiento de su dispositivo e incluya el nombre del codificador y los detalles del error.
+
+    La grabación podría estar incompleta.
+
+    Error: { $error }
+shutdown-pending-saves =
+    { $count ->
+        [0] Finalización del apagado
+        [one] 1 guardado pendiente de foto/vídeo
+       *[other] { $count } guardados pendientes de foto/vídeo
+    }
+settings-controls-position-description = Sitúa los controles de captura en el borde inferior, izquierdo o derecho. Al moverlos hacia la izquierda o la derecha, la barra de título se desplaza al borde opuesto sin rotar la vista previa de la cámara.
+settings-overlay-effect = Efecto superposición
+settings-overlay-effect-description = Cómo se superponen los controles a la vista previa. El efecto de cristal esmerilado difumina la vista previa que hay detrás, lo que consume más GPU.
+overlay-effect-frosted = Vidrio esmerilado
+settings-default-mode-description = Modo de cámara que se utilizará al iniciar la aplicación
+settings-motion-photo = Fotografía en movimiento
+settings-motion-photo-description = Almacena continuamente en memoria un vídeo corto con el codificador de vídeo seleccionado. Guarda fotos JPEG/AVIF con 1,25 segundos antes y después del obturador. No disponible para PNG/DNG; tu preferencia se conserva al cambiar de formato.
+settings-audio-encoder-description = Se aplica únicamente a grabaciones de vídeo. Las fotos en movimiento siempre utilizan AAC, tal como lo exige la especificación de Fotos en Movimiento de Android.
+settings-mirror-captures-description = Aplica el mismo volteo horizontal a las fotos, vídeos y secuencias de lapso de tiempo guardados
+settings-haptic-feedback-description = Vibrar al capturar, cambio de modo y cambio de cámara
+exposure-ev = EV
+exposure-time = Tiempo
+exposure-gain = Ganancia
+exposure-metering = Métrica
+exposure-auto-priority = Velocidad de fotogramas variable
+exposure-backlight = Luz de fondo
+color-sharpness = Nitidez
+ptz-tilt = Inclinación
+privacy-cover-closed = La cubierta de privacidad está cerrada
+privacy-cover-hint = Abra la tapa de privacidad para usar la cámara
+burst-mode-hold-steady = Mantén la calma…
+burst-mode-frames = { $captured }/{ $total } fotogramas
+settings-photo-format = Formato de salida
+settings-photo-format-description = Formato de archivo para fotos guardadas. JPEG y AVIF son formatos con pérdida, PNG es un formato sin pérdida, DNG conserva los datos sin procesar para su edición.
+settings-hdr-plus = HDR+ (experimental)
+settings-hdr-plus-description = Captura de múltiples fotogramas para obtener mejores fotos con poca luz y un mayor rango dinámico. La selección automática del número de fotogramas se basa en el brillo de la escena.
+settings-save-burst-raw = Guarda los fotogramas de ráfaga sin procesar
+settings-save-burst-raw-description = Guarda los fotogramas individuales de la ráfaga como archivos DNG junto con las fotos HDR+. Útil para la depuración o el reprocesamiento.
+settings-composition-guide = Guía de composición
+settings-composition-guide-description = Superponga líneas guía en la vista previa de la cámara para encuadrar
+guide-rule-of-thirds = Regla de Tercios
+guide-phi-grid = Red Phi
+insights-decoder-chain = Cadena de reserva del decodificador
+insights-stream-combined = Vista previa + Captura de flujo
+insights-frame-latency = Latencia de fotograma
+insights-frame-size-decoded = Tamaño de fotograma
+insights-gpu-upload-time = Tiempo de carga de GPU
+insights-gpu-upload-bandwidth = Ancho de banda de subida de GPU
+insights-format-source = Origen
+insights-cpu-decode-time = Tiempo de decodificación de la CPU
+insights-format-wgpu = Procesamiento de GPU
+insights-pipeline-handler = Manipulador de conducto
+insights-libcamera-version = Versión de libcamera
+insights-mjpeg-decoder = Decodificador MJPEG
+insights-multistream-single = Flujo único
+insights-multistream-dual = Flujo dual
+insights-multistream-source-shared = Vista previa y Captura
+insights-multistream-source-separate = Vista previa / Captura
+insights-stream-preview = Flujo de vista previa
+insights-stream-capture = Flujo de captura
+insights-stream-pixel-format = Formato Pixelar
+insights-recording-pusher = Empujador de Aplsrc
+insights-recording-pts = PTS Actual
+insights-recording-pipeline = Conducto
+insights-meta-colour-gains = Ganancia B/N (R, A)
+insights-meta-black-level = Nivel Negro
+settings-timelapse = Cámara Rápida
+insights-capture-burst = Ráfaga de captura
+shortcut-category-pickers = Recolectores
+shortcut-category-display = Pantalla
+shortcut-category-zoom = Zoom y encuadre
+action-switch-camera = Cambiar de cámara
