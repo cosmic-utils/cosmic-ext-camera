@@ -1096,7 +1096,76 @@ impl AppModel {
         if self.mode == CameraMode::Photo && self.flash.enabled && !self.flash.active {
             return self.start_preflash();
         }
+
+        // Focus on the shutter: ask libcamera for an autofocus scan and take
+        // the photo once it is done (handle_camera_frame() does the capture).
+        // A photo taken with focus left over from an earlier scene, or while
+        // the lens moves, is blurred.
+        if self.mode == CameraMode::Photo && self.camera_has_autofocus() {
+            if self.pending_focus_capture.is_none() {
+                debug!("Triggering autofocus before capture");
+                self.focus_control.request_scan();
+                self.pending_focus_capture = Some(crate::app::state::PendingFocusCapture {
+                    requested: std::time::Instant::now(),
+                    scan_seen: false,
+                });
+            }
+            return Task::none();
+        }
         self.capture_photo()
+    }
+
+    /// Longest a photo waits for an autofocus scan to finish.
+    pub(crate) const FOCUS_CAPTURE_TIMEOUT: std::time::Duration =
+        std::time::Duration::from_secs(3);
+
+    /// If no frame reports a running scan this long after the trigger, the
+    /// camera did not start one (focus already good, or no autofocus).
+    pub(crate) const FOCUS_SCAN_START_TIMEOUT: std::time::Duration =
+        std::time::Duration::from_millis(400);
+
+    fn current_af_state(&self) -> Option<crate::backends::camera::types::AfState> {
+        self.current_frame
+            .as_ref()
+            .and_then(|f| f.libcamera_metadata.as_ref())
+            .and_then(|m| m.af_state)
+    }
+
+    /// Whether the current camera reports autofocus state in its metadata.
+    pub(crate) fn camera_has_autofocus(&self) -> bool {
+        self.current_af_state().is_some()
+    }
+
+    /// Capture a photo waiting for autofocus once the triggered scan is done,
+    /// it did not start, or the timeout has passed.
+    pub(crate) fn take_focus_deferred_capture(&mut self) -> Option<Task<cosmic::Action<Message>>> {
+        use crate::backends::camera::types::AfState;
+
+        let mut pending = self.pending_focus_capture?;
+        let elapsed = pending.requested.elapsed();
+        let scanning = self.current_af_state() == Some(AfState::Scanning);
+        pending.scan_seen |= scanning;
+
+        let done = if pending.scan_seen {
+            !scanning
+        } else {
+            elapsed >= Self::FOCUS_SCAN_START_TIMEOUT
+        };
+        if !done && elapsed < Self::FOCUS_CAPTURE_TIMEOUT {
+            self.pending_focus_capture = Some(pending);
+            return None;
+        }
+
+        self.pending_focus_capture = None;
+        if self.mode != CameraMode::Photo {
+            return None;
+        }
+        debug!(
+            af_state = ?self.current_af_state(),
+            waited_ms = elapsed.as_millis() as u64,
+            "Taking photo after autofocus"
+        );
+        Some(self.capture_photo())
     }
 
     pub(crate) fn handle_toggle_flash(&mut self) -> Task<cosmic::Action<Message>> {

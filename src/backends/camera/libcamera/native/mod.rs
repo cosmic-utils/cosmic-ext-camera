@@ -47,6 +47,8 @@ use tracing::{error, info};
 /// Shared communication handles passed into the native pipeline
 pub(crate) struct PipelineSharedState {
     pub(crate) zoom: Arc<crate::backends::camera::zoom::ZoomControl>,
+    /// Autofocus scan requests from the UI
+    pub(crate) focus: Arc<crate::backends::camera::focus::FocusControl>,
     pub(crate) frame_sender: FrameSender,
     pub(crate) still_capture: Arc<StillCapture>,
     pub(crate) recording_sender: Arc<Mutex<Option<tokio::sync::mpsc::Sender<RecordingFrame>>>>,
@@ -111,6 +113,7 @@ impl NativeLibcameraPipeline {
 
         let params = CaptureThreadParams {
             zoom: Arc::clone(&shared.zoom),
+            focus: Arc::clone(&shared.focus),
             camera_id: camera_id.to_string(),
             preview_metrics: Arc::clone(&preview_metrics),
             preview_width: preview_format.width,

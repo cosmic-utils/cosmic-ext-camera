@@ -640,6 +640,7 @@ pub fn create_pipeline(
         false,
         PipelineSharedState {
             zoom: Default::default(),
+            focus: Default::default(),
             frame_sender: sender,
             still_capture: Default::default(),
             recording_sender: Arc::clone(&recording_sender),
@@ -735,6 +736,7 @@ mod tests {
             device.supports_multistream,
             super::PipelineSharedState {
                 zoom: Default::default(),
+                focus: Default::default(),
                 frame_sender: sender,
                 still_capture: Default::default(),
                 recording_sender: Default::default(),

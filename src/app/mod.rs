@@ -566,6 +566,7 @@ impl cosmic::Application for AppModel {
             photo_aspect_ratio: initial_aspect_ratio,
             zoom_level: 1.0,
             zoom_control: Default::default(),
+            focus_control: Default::default(),
             zoom_animation: None,
             preview_fit_to_view: initial_preview_fit,
             fit_animation: None,
@@ -581,6 +582,7 @@ impl cosmic::Application for AppModel {
             camera_stream_restart_counter: 0,
             still_capture: Default::default(),
             current_frame: None,
+            pending_focus_capture: None,
             available_cameras,
             camera_discovery_complete: false,
             current_camera_index,
@@ -1006,6 +1008,7 @@ impl cosmic::Application for AppModel {
         let cancel_flag = Arc::clone(&self.camera_cancel_flag);
         let still_capture = Arc::clone(&self.still_capture);
         let zoom_control = Arc::clone(&self.zoom_control);
+        let focus_control = Arc::clone(&self.focus_control);
         // Create a unique ID based on format properties to trigger restart when format changes
         let format_id = current_format
             .as_ref()
@@ -1165,6 +1168,7 @@ impl cosmic::Application for AppModel {
                                         still_capture: Arc::clone(&still_capture),
                                         recording_sender: rec_sender,
                                         zoom: Arc::clone(&zoom_control),
+                                        focus: Arc::clone(&focus_control),
 
                                         cancel_flag: Arc::clone(&cancel_flag),
                                     },

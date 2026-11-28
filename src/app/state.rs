@@ -802,6 +802,8 @@ pub struct AppModel {
     /// Desired camera/encoder zoom. Applied ScalerCrop belongs to each frame,
     /// not to this shared request mailbox.
     pub(crate) zoom_control: Arc<crate::backends::camera::zoom::ZoomControl>,
+    /// Autofocus scan requests to the capture thread
+    pub(crate) focus_control: Arc<crate::backends::camera::focus::FocusControl>,
     /// In-flight zoom transition, or `None` when settled on `zoom_level`.
     /// Set by the zoom-reset button; pinch / step zoom set `zoom_level`
     /// directly and clear this so they remain real-time.
@@ -841,6 +843,9 @@ pub struct AppModel {
     pub(crate) still_capture: std::sync::Arc<crate::backends::camera::still_capture::StillCapture>,
     /// Current camera frame
     pub current_frame: Option<Arc<CameraFrame>>,
+    /// Photo waiting for autofocus: captured once the scan triggered by the
+    /// shutter has finished, or when its deadline passes.
+    pub pending_focus_capture: Option<PendingFocusCapture>,
     /// Available camera devices
     pub available_cameras: Vec<CameraDevice>,
     /// Whether camera discovery has returned, including an empty result.
@@ -2132,4 +2137,13 @@ mod burst_result_tests {
             assert_eq!(burst.try_get_result(), None);
         }
     }
+}
+
+/// A photo waiting for the autofocus scan triggered by the shutter.
+#[derive(Debug, Clone, Copy)]
+pub struct PendingFocusCapture {
+    /// When the shutter was pressed
+    pub requested: std::time::Instant,
+    /// A frame has reported the scan as running
+    pub scan_seen: bool,
 }
